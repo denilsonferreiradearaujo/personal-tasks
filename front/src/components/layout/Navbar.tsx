@@ -5,155 +5,148 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   CheckSquare,
-  LayoutGrid,
-  Users,
   Plus,
   LogOut,
   LogIn,
-  UserPlus,
-  ShieldCheck,
   Crown,
+  Menu,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useSettings } from '../../context/SettingsContext';
 import { Button } from '../ui/Button';
 import { getInitials } from '../../lib/utils';
 
 interface NavbarProps {
   onOpenNewTask?: () => void;
-  onOpenNewUser?: () => void;
+  onToggleMobile?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
   onOpenNewTask,
-  onOpenNewUser,
+  onToggleMobile,
 }) => {
   const pathname = usePathname();
   const { user, isAuthenticated, logout, loading } = useAuth();
+  const { settings } = useSettings();
 
-  const isAdminOrRoot = user?.role === 'ADMIN' || user?.role === 'ROOT';
   const isRoot = user?.role === 'ROOT';
 
+  const getPageTitle = () => {
+    switch (pathname) {
+      case '/':
+        return 'Quadro de Tarefas (Kanban)';
+      case '/usuarios':
+        return 'Gestão de Usuários';
+      case '/configuracoes':
+        return 'Configurações do Sistema';
+      default:
+        return settings.appTitle || 'Personal Tasks';
+    }
+  };
+
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-slate-200/80 bg-white/80 backdrop-blur-md">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+    <header className="sticky top-0 z-20 w-full border-b border-slate-200/80 bg-white/90 backdrop-blur-md">
+      <div className="px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         {/* =====================================================
-            BRAND & NAVEGAÇÃO
+            ESQUERDA: TOGGLE MOBILE & TÍTULO DA PÁGINA
         ====================================================== */}
-        <div className="flex items-center space-x-8">
-          <Link href="/" className="flex items-center space-x-3 group">
-            <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-blue-700 to-sky-500 flex items-center justify-center text-white shadow-md shadow-blue-500/20 group-hover:scale-105 transition-transform">
-              <CheckSquare className="h-5 w-5" />
-            </div>
-            <div>
-              <span className="text-lg font-black tracking-tight text-slate-900 flex items-center gap-1.5">
-                SENAI <span className="text-blue-600 font-bold">Tasks</span>
-              </span>
-              <span className="text-[10px] uppercase font-semibold text-slate-400 block -mt-1 tracking-wider">
-                Simulado SAEP
-              </span>
-            </div>
-          </Link>
-
-          <nav className="hidden md:flex items-center space-x-1">
-            {/* Quadro Kanban - acessível */}
-            <Link
-              href="/"
-              className={`flex items-center space-x-2 px-3.5 py-2 rounded-lg text-sm font-medium transition-colors ${
-                pathname === '/'
-                  ? 'bg-blue-50 text-blue-700 font-semibold'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'
-              }`}
+        <div className="flex items-center space-x-3">
+          {isAuthenticated && onToggleMobile && (
+            <button
+              onClick={onToggleMobile}
+              className="md:hidden p-2 text-slate-500 hover:text-slate-900 rounded-lg hover:bg-slate-100 transition-colors"
+              title="Abrir menu"
             >
-              <LayoutGrid className="h-4 w-4" />
-              <span>Quadro Kanban</span>
-            </Link>
+              <Menu className="h-5 w-5" />
+            </button>
+          )}
 
-            {/* Usuários - VISÍVEL APENAS PARA ADMIN E ROOT */}
-            {isAuthenticated && isAdminOrRoot && (
-              <Link
-                href="/usuarios"
-                className={`flex items-center space-x-2 px-3.5 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  pathname === '/usuarios'
-                    ? 'bg-blue-50 text-blue-700 font-semibold'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'
-                }`}
-              >
-                <Users className="h-4 w-4" />
-                <span>Gestão de Usuários</span>
-              </Link>
-            )}
-          </nav>
+          {/* Logo exibido apenas se não autenticado (quando não há sidebar) */}
+          {!isAuthenticated ? (
+            <Link href="/" className="flex items-center space-x-2.5">
+              {settings.logoUrl ? (
+                <img
+                  src={settings.logoUrl}
+                  alt={settings.appTitle}
+                  style={{ maxHeight: `${settings.logoHeight || 36}px` }}
+                  className="object-contain"
+                />
+              ) : (
+                <div className="h-9 w-9 rounded-xl bg-gradient-to-tr from-blue-700 to-sky-500 flex items-center justify-center text-white shadow-md shadow-blue-500/20">
+                  <CheckSquare className="h-5 w-5" />
+                </div>
+              )}
+              <span className="text-lg font-black tracking-tight text-slate-900">
+                {settings.appTitle || 'Personal Tasks'}
+              </span>
+            </Link>
+          ) : (
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-bold text-slate-800 hidden sm:inline">
+                {getPageTitle()}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* =====================================================
-            AÇÕES & PERFIL DO USUÁRIO
+            DIREITA: AÇÕES & PERFIL DO USUÁRIO
         ====================================================== */}
         <div className="flex items-center space-x-3">
           {loading ? (
-            <div className="hidden sm:block h-8 w-20 rounded-lg bg-slate-100 animate-pulse" />
+            <div className="h-8 w-24 rounded-lg bg-slate-100 animate-pulse" />
           ) : isAuthenticated && user ? (
             <>
-              {/* BOTÃO NOVA TAREFA */}
+              {/* BOTÃO NOVA TAREFA (mantido no Header para fácil acesso) */}
               {onOpenNewTask && (
                 <Button
                   onClick={onOpenNewTask}
                   size="sm"
-                  className="hidden sm:inline-flex items-center gap-1.5"
+                  className="inline-flex items-center gap-1.5 shadow-xs"
                 >
                   <Plus className="h-4 w-4" />
                   <span>Nova Tarefa</span>
                 </Button>
               )}
 
-              {/* BOTÃO NOVO USUÁRIO (APENAS ADMIN/ROOT) */}
-              {isAdminOrRoot && onOpenNewUser && (
-                <Button
-                  onClick={onOpenNewUser}
-                  variant="outline"
-                  size="sm"
-                  className="hidden sm:inline-flex items-center gap-1.5"
-                >
-                  <UserPlus className="h-4 w-4" />
-                  <span>Novo Usuário</span>
-                </Button>
-              )}
-
-              {/* PERFIL DO USUÁRIO */}
-              <div className="flex items-center pl-3 border-l border-slate-200 space-x-3">
-                <div className="flex items-center space-x-2.5">
-                  <div className="h-8 w-8 rounded-full bg-slate-900 text-white font-bold text-xs flex items-center justify-center shadow-sm relative">
+              {/* PERFIL DO USUÁRIO NO HEADER */}
+              <div className="flex items-center pl-2 sm:pl-3 border-l border-slate-200 space-x-2.5">
+                <div className="flex items-center space-x-2">
+                  <div className="h-8 w-8 rounded-full bg-slate-900 text-white font-bold text-xs flex items-center justify-center shadow-xs relative">
                     {getInitials(user.nome)}
                     {isRoot && (
-                      <span className="absolute -top-1 -right-1 bg-amber-500 text-white p-0.5 rounded-full" title="Root Admin">
+                      <span
+                        className="absolute -top-1 -right-1 bg-amber-500 text-white p-0.5 rounded-full shadow-xs"
+                        title="Root Admin"
+                      >
                         <Crown className="w-2.5 h-2.5" />
                       </span>
                     )}
                   </div>
-                  <div className="hidden lg:block text-left">
-                    <div className="flex items-center gap-1.5">
+                  <div className="hidden xl:block text-left">
+                    <div className="flex items-center gap-1">
                       <span className="text-xs font-bold text-slate-800 leading-tight">
                         {user.nome}
                       </span>
                       {user.role === 'ROOT' ? (
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 uppercase flex items-center gap-0.5">
+                        <span className="text-[9px] font-extrabold px-1 py-0.2 rounded bg-amber-100 text-amber-800 uppercase flex items-center gap-0.5">
                           <Crown className="w-2.5 h-2.5" /> ROOT
                         </span>
                       ) : user.role === 'ADMIN' ? (
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 uppercase flex items-center gap-0.5">
-                          <ShieldCheck className="w-2.5 h-2.5" /> ADMIN
+                        <span className="text-[9px] font-bold px-1 py-0.2 rounded bg-blue-100 text-blue-800 uppercase">
+                          ADMIN
                         </span>
                       ) : null}
                     </div>
-                    <div className="text-[11px] text-slate-400 leading-tight">
+                    <span className="text-[10px] text-slate-400 block truncate max-w-[150px]">
                       {user.email}
-                    </div>
+                    </span>
                   </div>
                 </div>
 
-                {/* LOGOUT */}
                 <button
                   onClick={logout}
-                  title="Sair da Conta"
+                  title="Sair do sistema"
                   className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
                 >
                   <LogOut className="h-4 w-4" />
@@ -161,20 +154,12 @@ export const Navbar: React.FC<NavbarProps> = ({
               </div>
             </>
           ) : (
-            /* NÃO AUTENTICADO */
-            <div className="flex items-center space-x-2">
-              <Link href="/login">
-                <Button variant="ghost" size="sm" className="flex items-center gap-1.5">
-                  <LogIn className="h-4 w-4" />
-                  <span>Entrar</span>
-                </Button>
-              </Link>
-              <Link href="/register">
-                <Button variant="outline" size="sm">
-                  Registrar
-                </Button>
-              </Link>
-            </div>
+            <Link href="/login">
+              <Button size="sm" variant="primary" className="inline-flex items-center gap-1.5">
+                <LogIn className="h-4 w-4" />
+                <span>Entrar</span>
+              </Button>
+            </Link>
           )}
         </div>
       </div>

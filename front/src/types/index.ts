@@ -6,6 +6,7 @@ export interface User {
   id_usuario: number;
   nome: string;
   email: string;
+  telefone?: string;
   role?: UserRole;
   ativo?: boolean;
   data_criacao?: string;

@@ -30,6 +30,7 @@ export class UsersService {
       data: {
         nome: createUserDto.nome,
         email,
+        telefone: createUserDto.telefone ? createUserDto.telefone.replace(/\D/g, '') : null,
         senha: senhaHash,
         role: 'USER',
         ativo: true, // Criado via painel de administração já nasce ativo
@@ -38,6 +39,7 @@ export class UsersService {
         id_usuario: true,
         nome: true,
         email: true,
+        telefone: true,
         role: true,
         ativo: true,
         data_criacao: true,
@@ -53,6 +55,7 @@ export class UsersService {
         id_usuario: true,
         nome: true,
         email: true,
+        telefone: true,
         role: true,
         ativo: true,
         data_criacao: true,

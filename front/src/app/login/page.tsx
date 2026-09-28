@@ -5,12 +5,14 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { CheckSquare, Lock, Mail, ArrowRight, AlertCircle, KeyRound } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useSettings } from '../../context/SettingsContext';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 
 export default function LoginPage() {
   const router = useRouter();
   const { login } = useAuth();
+  const { settings } = useSettings();
 
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
@@ -45,11 +47,25 @@ export default function LoginPage() {
       <div className="w-full max-w-md space-y-8 text-center">
         {/* Logo Header */}
         <div>
-          <div className="mx-auto h-14 w-14 rounded-2xl bg-gradient-to-tr from-blue-700 to-sky-500 flex items-center justify-center text-white shadow-lg shadow-blue-500/25 mb-4">
-            <CheckSquare className="h-7 w-7" />
-          </div>
-          <h2 className="text-2xl font-black text-slate-900 tracking-tight">
-            Acesse sua conta
+          {settings.logoUrl ? (
+            <img
+              src={settings.logoUrl}
+              alt={settings.appTitle}
+              style={{ maxHeight: `${settings.logoHeight || 44}px` }}
+              className="mx-auto object-contain mb-4"
+            />
+          ) : (
+            <div className="mx-auto h-14 w-14 rounded-2xl bg-gradient-to-tr from-blue-700 to-sky-500 flex items-center justify-center text-white shadow-lg shadow-blue-500/25 mb-4">
+              <CheckSquare className="h-7 w-7" />
+            </div>
+          )}
+          <h2
+            style={{
+              fontFamily: `'${settings.titleFontFamily || 'Inter'}', sans-serif`,
+            }}
+            className="text-2xl font-black text-slate-900 tracking-tight"
+          >
+            {settings.appTitle || 'Personal Tasks'}
           </h2>
           <p className="mt-1 text-sm text-slate-500">
             Entre com suas credenciais para gerenciar suas tarefas e equipes.

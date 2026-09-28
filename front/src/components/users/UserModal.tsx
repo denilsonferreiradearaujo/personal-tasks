@@ -15,6 +15,7 @@ interface UserModalProps {
 export const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, onSuccess }) => {
   const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');
+  const [telefone, setTelefone] = useState('');
   const [senha, setSenha] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,11 +34,13 @@ export const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, onSuccess
       await api.post('/usuarios', {
         nome: nome.trim(),
         email: email.trim(),
+        telefone: telefone.trim() || undefined,
         senha: senha || '123456',
       });
 
       setNome('');
       setEmail('');
+      setTelefone('');
       setSenha('');
       onSuccess();
       onClose();
@@ -78,6 +81,14 @@ export const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, onSuccess
           placeholder="Ex: carlos@senai.com"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+        />
+
+        <Input
+          label="WhatsApp / Telefone com DDD (Opcional)"
+          type="text"
+          placeholder="Ex: 5519999486552 ou 19999486552"
+          value={telefone}
+          onChange={(e) => setTelefone(e.target.value)}
         />
 
         <Input

@@ -17,4 +17,9 @@ export class CreateUserDto {
   @IsString()
   @MinLength(4, { message: 'A senha deve ter pelo menos 4 caracteres.' })
   senha?: string;
+
+  @ApiPropertyOptional({ example: '5519999486552', description: 'Telefone / WhatsApp do usuário com DDD' })
+  @IsOptional()
+  @IsString()
+  telefone?: string;
 }

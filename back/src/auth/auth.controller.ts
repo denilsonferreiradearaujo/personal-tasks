@@ -14,6 +14,7 @@ import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { ResetPasswordOtpDto } from './dto/reset-password-otp.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
 @ApiTags('Autenticação')
@@ -54,7 +55,7 @@ export class AuthController {
 
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Solicitar redefinição de senha por e-mail' })
+  @ApiOperation({ summary: 'Solicitar redefinição de senha por e-mail ou WhatsApp' })
   async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
     return this.authService.forgotPassword(forgotPasswordDto);
   }
@@ -64,5 +65,12 @@ export class AuthController {
   @ApiOperation({ summary: 'Redefinir senha informando o token recebido por e-mail' })
   async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
     return this.authService.resetPassword(resetPasswordDto);
+  }
+
+  @Post('reset-password-otp')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Redefinir senha informando o código OTP de 5 dígitos recebido pelo WhatsApp' })
+  async resetPasswordOtp(@Body() resetPasswordOtpDto: ResetPasswordOtpDto) {
+    return this.authService.resetPasswordOtp(resetPasswordOtpDto);
   }
 }

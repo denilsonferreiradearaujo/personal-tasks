@@ -12,6 +12,7 @@ model User {
   nome                  String               @db.VarChar(255)
   email                 String               @unique @db.VarChar(255)
   senha                 String               @db.VarChar(255)
+  telefone              String?              @db.VarChar(50) // WhatsApp para redefinição/notificações
   role                  String               @default("USER") @db.VarChar(50) // "ROOT", "ADMIN", "USER"
   ativo                 Boolean              @default(false) // Requer aprovação do admin
   data_criacao          DateTime             @default(now()) @map("data_cadastro")
@@ -82,4 +83,42 @@ model PasswordResetToken {
 
   @@index([email])
   @@map("password_reset_token")
+}
+
+model SystemSettings {
+  id                  Int      @id @default(1)
+  appTitle            String   @default("Personal Tasks") @db.VarChar(255)
+  logoUrl             String?  @db.LongText
+  logoHeight          Int      @default(36)
+  titleFontSize       Int      @default(18)
+  titleFontFamily     String   @default("Inter") @db.VarChar(100)
+  notificationChannel String   @default("SMTP") @db.VarChar(50) // "SMTP", "WHATSAPP", "BOTH"
+
+  // Configurações SMTP
+  smtpHost            String?  @default("smtp.gmail.com") @db.VarChar(255)
+  smtpPort            Int?     @default(587)
+  smtpUser            String?  @db.VarChar(255)
+  smtpPass            String?  @db.VarChar(255)
+  smtpFrom            String?  @db.VarChar(255)
+
+  // Configurações Evolution API (WhatsApp)
+  whatsappUrl         String?  @db.Text
+  whatsappToken       String?  @db.Text
+  whatsappInstance    String?  @db.VarChar(255)
+
+  updatedAt           DateTime @updatedAt
+
+  @@map("configuracao_sistema")
+}
+
+model OtpToken {
+  id         Int      @id @default(autoincrement())
+  identifier String   @db.VarChar(100) // Telefone normalizado com 55
+  code       String   @db.VarChar(10)  // Código de 5 dígitos
+  expiresAt  DateTime
+  used       Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([identifier])
+  @@map("otp_tokens")
 }
