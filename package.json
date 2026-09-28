@@ -1,0 +1,35 @@
+{
+  "name": "prova-senai-fullstack",
+  "version": "2.0.0",
+  "description": "Sistema Corporativo de Gerenciamento de Tarefas - NestJS + Next.js + Prisma ORM + MySQL + Cypress + Docker",
+  "scripts": {
+    "dev:back": "npm run start:dev --prefix back",
+    "dev:front": "npm run dev --prefix front",
+    "build:back": "npm run build --prefix back",
+    "build:front": "npm run build --prefix front",
+    "build": "npm run build:back && npm run build:front",
+    "docker:up": "docker compose up --build -d",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f",
+    "cypress:open": "npm run cypress:open --prefix front",
+    "cypress:run": "npm run cypress:run --prefix front",
+    "prisma:generate": "npm run prisma:generate --prefix back",
+    "prisma:push": "npm run prisma:push --prefix back",
+    "prisma:seed": "npm run prisma:seed --prefix back",
+    "prisma:studio": "npm run prisma:studio --prefix back"
+  },
+  "keywords": [
+    "nestjs",
+    "nextjs",
+    "prisma",
+    "mysql",
+    "cypress",
+    "docker",
+    "jwt",
+    "bcrypt",
+    "saep",
+    "senai"
+  ],
+  "author": "Antigravity",
+  "license": "ISC"
+}

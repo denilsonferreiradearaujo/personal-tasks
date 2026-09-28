@@ -1,0 +1,85 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id_usuario            Int                  @id @default(autoincrement())
+  nome                  String               @db.VarChar(255)
+  email                 String               @unique @db.VarChar(255)
+  senha                 String               @db.VarChar(255)
+  role                  String               @default("USER") @db.VarChar(50) // "ROOT", "ADMIN", "USER"
+  ativo                 Boolean              @default(false) // Requer aprovação do admin
+  data_criacao          DateTime             @default(now()) @map("data_cadastro")
+  tarefas               Tarefa[]             @relation("TarefasCriadas")
+  comentarios           TarefaComentario[]
+  compartilhamentos     TarefaCompartilhada[]
+
+  @@map("usuario")
+}
+
+model Tarefa {
+  id_tarefa             Int                  @id @default(autoincrement())
+  id_usuario            Int
+  descricao             String               @db.Text
+  equipe                String               @db.VarChar(255)
+  prioridade            String               @db.VarChar(50)
+  status                String               @default("Não Iniciado") @db.VarChar(50)
+  isCompartilhada       Boolean              @default(false)
+  shareToken            String?              @unique @db.VarChar(255)
+  data_cadastro         DateTime             @default(now())
+  usuario               User                 @relation("TarefasCriadas", fields: [id_usuario], references: [id_usuario], onDelete: Cascade)
+  comentarios           TarefaComentario[]
+  compartilhamentos     TarefaCompartilhada[]
+
+  @@index([id_usuario], map: "tarefa_id_usuario_fkey")
+  @@map("tarefa")
+}
+
+model TarefaCompartilhada {
+  id                    Int      @id @default(autoincrement())
+  id_tarefa             Int
+  email                 String   @db.VarChar(255)
+  id_usuario            Int?
+  data_compartilhamento DateTime @default(now())
+  tarefa                Tarefa   @relation(fields: [id_tarefa], references: [id_tarefa], onDelete: Cascade)
+  usuario               User?    @relation(fields: [id_usuario], references: [id_usuario], onDelete: SetNull)
+
+  @@index([id_tarefa])
+  @@index([id_usuario])
+  @@map("tarefa_compartilhada")
+}
+
+model TarefaComentario {
+  id_comentario         Int      @id @default(autoincrement())
+  id_tarefa             Int
+  id_usuario            Int
+  conteudo              String   @db.Text
+  tipo                  String   @default("TEXT") @db.VarChar(50) // "TEXT", "IMAGE", "FILE"
+  arquivo_url           String?  @db.Text
+  arquivo_nome          String?  @db.VarChar(255)
+  data_criacao          DateTime @default(now())
+  data_atualizacao      DateTime @updatedAt
+  tarefa                Tarefa   @relation(fields: [id_tarefa], references: [id_tarefa], onDelete: Cascade)
+  usuario               User     @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade)
+
+  @@index([id_tarefa])
+  @@index([id_usuario])
+  @@map("tarefa_comentario")
+}
+
+model PasswordResetToken {
+  id                    Int      @id @default(autoincrement())
+  email                 String   @db.VarChar(255)
+  token                 String   @unique @db.VarChar(255)
+  expiresAt             DateTime
+  used                  Boolean  @default(false)
+  createdAt             DateTime @default(now())
+
+  @@index([email])
+  @@map("password_reset_token")
+}

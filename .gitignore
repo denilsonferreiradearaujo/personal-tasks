@@ -1,0 +1,55 @@
+# Dependencies
+node_modules/
+*/node_modules/
+package-lock.json
+!back/package.json
+!front/package.json
+!package.json
+
+# Production Builds
+dist/
+*/dist/
+.next/
+*/.next/
+out/
+build/
+
+# Environment Variables & Secrets
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+back/.env
+front/.env.local
+*.env
+!*.env.example
+!back/.env.example
+!front/.env.example
+
+# Uploaded Files & User Media
+back/uploads/*
+!back/uploads/.gitkeep
+
+# Legacy & Backups
+legacy_backup/
+*.bak
+*.old
+
+# Debug & Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+*.log
+
+# Editor & OS Files
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.DS_Store
+Thumbs.db

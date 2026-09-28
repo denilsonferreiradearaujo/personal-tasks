@@ -1,0 +1,68 @@
+services:
+  # 1. Banco de Dados MySQL 8.0
+  db:
+    image: mysql:8.0
+    container_name: prova_mysql_db
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: 1234
+      MYSQL_DATABASE: simulado_saep
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p1234 || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    networks:
+      - prova_network
+
+  # 2. Backend NestJS + Prisma ORM + JWT + Bcrypt
+  backend:
+    build:
+      context: ./back
+      dockerfile: Dockerfile
+    container_name: prova_backend_api
+    restart: always
+    environment:
+      PORT: 3001
+      DATABASE_URL: mysql://root:1234@db:3306/simulado_saep
+      JWT_SECRET: segredo_super_seguro_jwt_senai_saep_2024
+      JWT_EXPIRES_IN: 7d
+    ports:
+      - "3001:3001"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - prova_network
+
+  # 3. Frontend Next.js + TailwindCSS + Kanban
+  frontend:
+    build:
+      context: ./front
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:3001
+    container_name: prova_frontend_web
+    restart: always
+    environment:
+      PORT: 3000
+      NEXT_PUBLIC_API_URL: http://localhost:3001
+    ports:
+      - "3002:3000"
+    depends_on:
+      - backend
+    networks:
+      - prova_network
+
+volumes:
+  mysql_data:
+    driver: local
+
+networks:
+  prova_network:
+    driver: bridge
