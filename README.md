@@ -169,14 +169,30 @@ Abra seu navegador em [http://localhost:3002](http://localhost:3002).
 
 ---
 
-## 🔑 Acesso Inicial (Administrador Root)
+## 🔑 Acesso Inicial (Configuração do Administrador Root)
 
-Ao rodar o seed, o sistema inicializa com o usuário Root configurado:
-- **E-mail**: `denilson.ferreiradearaujo@gmail.com`
-- **Senha Padrão**: `123456`
-- **Perfil**: `ROOT` (Permissão total para criar tarefas, aprovar contas pendentes e gerenciar administradores)
+Para configurar o seu próprio usuário **Root** com privilégios totais na aplicação:
 
-> 💡 **Nota de Segurança**: Após o primeiro acesso, você pode alterar sua senha utilizando a funcionalidade de redefinição de senha com envio por e-mail.
+1. Abra o arquivo [`back/prisma/seed.ts`](file:///back/prisma/seed.ts) e informe o seu **nome**, **e-mail** e **senha**:
+   ```typescript
+   // back/prisma/seed.ts
+   const rootNome = 'Seu Nome Completo';
+   const rootEmail = 'seu.email@exemplo.com';
+   const rootSenha = 'sua_senha_inicial'; // Ex: 123456
+   ```
+   *(Ou se preferir, defina as variáveis `ROOT_NOME`, `ROOT_EMAIL` e `ROOT_PASSWORD` no seu arquivo `back/.env`)*.
+
+2. Execute o comando de seed na pasta `back`:
+   ```bash
+   cd back
+   npm run prisma:seed
+   ```
+
+3. Pronto! O banco de dados será inicializado com o seu usuário configurado com o cargo **`ROOT`** (permissão total para gerenciar o Kanban, aprovar novos usuários e promover outros administradores).
+
+4. Acesse a tela de login em [http://localhost:3002/login](http://localhost:3002/login) com o seu e-mail e senha cadastrados.
+
+> 💡 **Nota de Segurança**: Após o primeiro acesso, você pode alterar sua senha a qualquer momento através da funcionalidade de redefinição de senha com envio por e-mail.
 
 ---
 

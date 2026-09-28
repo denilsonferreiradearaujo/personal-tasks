@@ -13,15 +13,20 @@ async function main() {
   await prisma.tarefa.deleteMany();
   await prisma.user.deleteMany();
 
-  // Gerar hash para a senha inicial do Root (123456)
+  // Configuração do Usuário Root (altere aqui com seu nome, e-mail e senha desejados)
+  const rootNome = process.env.ROOT_NOME || 'Administrador Root';
+  const rootEmail = process.env.ROOT_EMAIL || 'admin@exemplo.com';
+  const rootSenha = process.env.ROOT_PASSWORD || '123456';
+
+  // Gerar hash para a senha inicial do Root
   const salt = await bcrypt.genSalt(10);
-  const senhaHash = await bcrypt.hash('123456', salt);
+  const senhaHash = await bcrypt.hash(rootSenha, salt);
 
   // Criar Usuário Root único
   const rootUser = await prisma.user.create({
     data: {
-      nome: 'DENILSON FERREIRA DE ARAUJO',
-      email: 'denilson.ferreiradearaujo@gmail.com',
+      nome: rootNome,
+      email: rootEmail,
       senha: senhaHash,
       role: 'ROOT',
       ativo: true,
