@@ -285,25 +285,36 @@ export default function SettingsPage() {
       <div className="flex-1 flex flex-col min-w-0">
         <Navbar onToggleMobile={() => setIsMobileMenuOpen(true)} />
 
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto w-full">
+        <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {/* Header da Página */}
-          <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <span className="p-2 bg-blue-100 text-blue-700 rounded-xl">
-                  <Settings className="h-6 w-6" />
-                </span>
-                <h1 className="text-2xl font-black text-slate-900 tracking-tight">
-                  Configurações do Sistema
-                </h1>
-                <span className="inline-flex items-center gap-1 text-[11px] font-extrabold px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 border border-amber-200">
-                  <Crown className="w-3 h-3 text-amber-600" />
+          <div className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="text-left">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-semibold mb-2">
+                <Settings className="h-3.5 w-3.5" />
+                <span>Painel de Configurações do Sistema</span>
+                <span className="inline-flex items-center gap-1 text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 ml-1">
+                  <Crown className="w-2.5 h-2.5 text-amber-600" />
                   ROOT ONLY
                 </span>
               </div>
-              <p className="text-sm text-slate-500">
+              <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+                Configurações do Sistema
+              </h1>
+              <p className="text-sm text-slate-500 mt-1">
                 Personalize a identidade visual, logotipo corporativo e canais de envio (WhatsApp Evolution API & SMTP).
               </p>
+            </div>
+
+            <div className="flex items-center gap-2 self-start md:self-auto">
+              <Button
+                type="button"
+                onClick={() => (document.getElementById('save-settings-bottom-btn') as HTMLButtonElement)?.click()}
+                isLoading={isSaving}
+                className="flex items-center gap-2"
+              >
+                <Save className="h-4 w-4" />
+                <span>Salvar Configurações</span>
+              </Button>
             </div>
           </div>
 
@@ -802,6 +813,7 @@ export default function SettingsPage() {
             {/* Botão de Salvar Alterações */}
             <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
               <Button
+                id="save-settings-bottom-btn"
                 type="submit"
                 size="lg"
                 isLoading={isSaving}
