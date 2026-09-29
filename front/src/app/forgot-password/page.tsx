@@ -97,7 +97,7 @@ export default function ForgotPasswordPage() {
       } else {
         setSuccessMessage(
           res.data?.message ||
-            'Se este usuário estiver cadastrado, as instruções foram enviadas com sucesso.'
+          'Se este usuário estiver cadastrado, as instruções foram enviadas com sucesso.'
         );
       }
     } catch (err: any) {
@@ -349,11 +349,10 @@ export default function ForgotPasswordPage() {
                     setMethod('whatsapp');
                     setError(null);
                   }}
-                  className={`flex-1 py-2 px-3 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
-                    method === 'whatsapp'
+                  className={`flex-1 py-2 px-3 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${method === 'whatsapp'
                       ? 'bg-white text-emerald-700 shadow-xs'
                       : 'text-slate-500 hover:text-slate-700'
-                  }`}
+                    }`}
                 >
                   <MessageSquare className="h-4 w-4 text-emerald-600" />
                   <span>WhatsApp (OTP)</span>
@@ -365,11 +364,10 @@ export default function ForgotPasswordPage() {
                     setMethod('email');
                     setError(null);
                   }}
-                  className={`flex-1 py-2 px-3 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
-                    method === 'email'
+                  className={`flex-1 py-2 px-3 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${method === 'email'
                       ? 'bg-white text-blue-700 shadow-xs'
                       : 'text-slate-500 hover:text-slate-700'
-                  }`}
+                    }`}
                 >
                   <Mail className="h-4 w-4 text-blue-600" />
                   <span>E-mail (SMTP)</span>
@@ -391,7 +389,7 @@ export default function ForgotPasswordPage() {
                       type="text"
                       required
                       id="forgot-phone"
-                      placeholder="Ex: 5519999486552 ou 19999486552"
+                      placeholder="Ex: 5511999999999 ou 11999999999"
                       icon={<Phone className="h-4 w-4 text-emerald-600" />}
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
@@ -403,11 +401,11 @@ export default function ForgotPasswordPage() {
                 ) : (
                   <div>
                     <Input
-                      label="Seu E-mail Cadastrado"
+                      label="Email Cadastrado"
                       type="email"
                       required
                       id="forgot-email"
-                      placeholder="seu.email@senai.com"
+                      placeholder="email@empresa.com"
                       icon={<Mail className="h-4 w-4 text-blue-600" />}
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}

@@ -25,8 +25,8 @@ export default function RegisterPage() {
       return;
     }
 
-    if (senha.length < 4) {
-      setError('A senha deve possuir pelo menos 4 caracteres.');
+    if (senha.length < 8) {
+      setError('A senha deve possuir pelo menos 8 caracteres.');
       return;
     }
 
@@ -84,11 +84,11 @@ export default function RegisterPage() {
             />
 
             <Input
-              label="E-mail Corporativo *"
+              label="Email *"
               type="email"
               required
               id="register-email"
-              placeholder="seu.email@senai.com"
+              placeholder="email@empresa.com"
               icon={<Mail className="h-4 w-4" />}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -99,7 +99,7 @@ export default function RegisterPage() {
               type="password"
               required
               id="register-senha"
-              placeholder="Mínimo 4 caracteres"
+              placeholder="Mínimo 8 caracteres"
               icon={<Lock className="h-4 w-4" />}
               value={senha}
               onChange={(e) => setSenha(e.target.value)}

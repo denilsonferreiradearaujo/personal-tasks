@@ -83,11 +83,11 @@ export default function LoginPage() {
             )}
 
             <Input
-              label="E-mail"
+              label="Email"
               type="email"
               required
               id="login-email"
-              placeholder="seu.email@senai.com"
+              placeholder="email@empresa.com"
               icon={<Mail className="h-4 w-4" />}
               value={email}
               onChange={(e) => setEmail(e.target.value)}

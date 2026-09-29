@@ -75,10 +75,10 @@ export const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, onSuccess
         />
 
         <Input
-          label="E-mail *"
+          label="Email *"
           type="email"
           required
-          placeholder="Ex: carlos@senai.com"
+          placeholder="email@empresa.com"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
         />

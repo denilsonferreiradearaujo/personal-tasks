@@ -39,8 +39,8 @@ Para o seu cenário na VPS Integrator (`vps6663`), onde você já possui `sep-pa
 | **Porta Frontend (Interna)** | `3004` |
 | **Repositório Git** | `https://github.com/denilsonferreiradearaujo/personal-tasks.git` |
 | **Painel ICP** | `https://vps6663.panel.icontainer.run:2090` |
-| **Sugestão Subdomínio Frontend** | `https://tasks.vps6663.panel.icontainer.run` |
-| **Sugestão Subdomínio Backend (API)**| `https://tasks-api.vps6663.panel.icontainer.run` |
+| **Sugestão Subdomínio Frontend** | `https://personaltasks.vps6663.panel.icontainer.run` |
+| **Sugestão Subdomínio Backend (API)**| `https://personaltasks-api.vps6663.panel.icontainer.run` |
 
 ---
 
@@ -98,16 +98,16 @@ npm install
 ```bash
 cat > .env << 'EOF'
 PORT=3003
-DATABASE_URL="mysql://tasks_user:SUA_SENHA_AQUI@localhost:3306/personal_tasks"
+DATABASE_URL="mysql://personal_tasks:Denilson2021!@@localhost:3306/personal_tasks"
 JWT_SECRET="c1f4e9a3b8d2e7f60123456789abcdef0123456789abcdef0123456789abcdef"
 JWT_EXPIRES_IN="7d"
-FRONTEND_URL="https://tasks.vps6663.panel.icontainer.run"
+FRONTEND_URL="https://personaltasks.vps6663.panel.icontainer.run"
 
 # Configuração SMTP para e-mails (redefinição de senha)
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
 SMTP_USER=denilson.ferreiradearaujo@gmail.com
-SMTP_PASS=rmoxnazhioftpare
+SMTP_PASS=226ACDB8BBC5-4730-A478-07B001DB14E4
 SMTP_FROM="Personal Tasks <denilson.ferreiradearaujo@gmail.com>"
 EOF
 ```
@@ -155,7 +155,7 @@ npm install
 3. Crie o arquivo `.env.local` informando a URL pública da API:
 ```bash
 cat > .env.local << 'EOF'
-NEXT_PUBLIC_API_URL=https://tasks-api.vps6663.panel.icontainer.run
+NEXT_PUBLIC_API_URL=https://personaltasks-api.vps6663.panel.icontainer.run
 EOF
 ```
 
@@ -210,7 +210,7 @@ Agora vamos conectar a internet aos seus processos locais usando o Nginx do ICP:
 #### 6.1 — Criar o Site para o Frontend
 1. No painel ICP, vá em **Web ➜ Create Site** (Criar Site).
 2. Preencha os campos:
-   - **Domain / Subdomain:** `tasks.vps6663.panel.icontainer.run` (ou o domínio que preferir)
+   - **Domain / Subdomain:** `personaltasks.vps6663.panel.icontainer.run` (ou o domínio que preferir)
    - **Type:** `Reverse Proxy` (Proxy Reverso)
    - **Target / Destination:** `http://127.0.0.1:3004`
    - **Enable SSL / HTTPS:** Marque ✅ **Sim** (Let's Encrypt)
@@ -219,7 +219,7 @@ Agora vamos conectar a internet aos seus processos locais usando o Nginx do ICP:
 #### 6.2 — Criar o Site para o Backend (API)
 1. Vá novamente em **Web ➜ Create Site**.
 2. Preencha os campos:
-   - **Domain / Subdomain:** `tasks-api.vps6663.panel.icontainer.run` (ou o domínio que preferir)
+   - **Domain / Subdomain:** `personaltasks-api.vps6663.panel.icontainer.run` (ou o domínio que preferir)
    - **Type:** `Reverse Proxy` (Proxy Reverso)
    - **Target / Destination:** `http://127.0.0.1:3003`
    - **Enable SSL / HTTPS:** Marque ✅ **Sim** (Let's Encrypt)
