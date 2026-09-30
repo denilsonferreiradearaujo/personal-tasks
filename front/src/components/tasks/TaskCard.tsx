@@ -22,6 +22,7 @@ interface TaskCardProps {
   onDelete: (id: number) => void;
   onStatusChange: (id: number, newStatus: TaskStatus) => void;
   onViewDetails?: (task: Task) => void;
+  isUnread?: boolean;
 }
 
 export const TaskCard: React.FC<TaskCardProps> = ({
@@ -30,6 +31,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   onDelete,
   onStatusChange,
   onViewDetails,
+  isUnread = false,
 }) => {
   const { user } = useAuth();
 
@@ -119,11 +121,13 @@ export const TaskCard: React.FC<TaskCardProps> = ({
           <button
             type="button"
             onClick={() => onViewDetails && onViewDetails(task)}
-            className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 hover:bg-blue-50 hover:text-blue-600 text-[11px] font-medium transition-colors"
+            className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-slate-100 hover:bg-blue-50 hover:text-blue-600 text-slate-600 transition-colors"
             title="Abrir Feed/Chat da Tarefa"
           >
             <MessageSquare className="h-3 w-3 text-slate-400" />
-            <span>{task.totalComentarios || 0}</span>
+            <span className={isUnread ? 'text-[12px] font-black text-slate-900' : 'text-[11px] font-medium text-slate-600'}>
+              {task.totalComentarios || 0}
+            </span>
           </button>
         </div>
 

@@ -5,6 +5,7 @@ import { Task, TaskStatus } from '../../types';
 import { TaskColumn } from './TaskColumn';
 import { TaskModal } from './TaskModal';
 import { TaskDetailModal } from './TaskDetailModal';
+import { ConfirmModal } from '../ui/ConfirmModal';
 import {
   Search,
   RefreshCw,
@@ -46,6 +47,36 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
   // Modal de Detalhes com Feed / Blog / Chat
   const [detailTask, setDetailTask] = useState<Task | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+
+  // Mapa de controle de leitura de comentários por tarefa: { [taskId]: totalLidos }
+  const [readCommentsMap, setReadCommentsMap] = useState<{ [key: number]: number }>({});
+
+  // Carregar do localStorage ao iniciar
+  React.useEffect(() => {
+    if (!currentUser) return;
+    const key = `personal_tasks_read_comments_${currentUser.id_usuario}`;
+    try {
+      const stored = localStorage.getItem(key);
+      if (stored) {
+        setReadCommentsMap(JSON.parse(stored));
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }, [currentUser]);
+
+  // Função para marcar como lido
+  const handleCommentsRead = (taskId: number, total: number) => {
+    if (!currentUser) return;
+    const key = `personal_tasks_read_comments_${currentUser.id_usuario}`;
+    setReadCommentsMap((prev) => {
+      const updated = { ...prev, [taskId]: total };
+      try {
+        localStorage.setItem(key, JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+  };
 
   // Lista única de equipes para filtro
   const uniqueTeams = useMemo(() => {
@@ -115,13 +146,29 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
   };
 
   const handleViewDetails = (task: Task) => {
+    handleCommentsRead(task.id_tarefa, task.totalComentarios || 0);
     setDetailTask(task);
     setIsDetailModalOpen(true);
   };
 
-  const handleDeleteClick = async (id: number) => {
-    if (confirm('Tem certeza que deseja excluir esta tarefa? Esta ação não pode ser desfeita.')) {
-      await onDeleteTask(id);
+  // Estado para exclusão segura com modal padronizado
+  const [taskToDeleteId, setTaskToDeleteId] = useState<number | null>(null);
+  const [isDeletingTask, setIsDeletingTask] = useState(false);
+
+  const handleDeleteClick = (id: number) => {
+    setTaskToDeleteId(id);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!taskToDeleteId) return;
+    try {
+      setIsDeletingTask(true);
+      await onDeleteTask(taskToDeleteId);
+      setTaskToDeleteId(null);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsDeletingTask(false);
     }
   };
 
@@ -262,6 +309,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
           onStatusChange={onUpdateStatus}
           onViewDetails={handleViewDetails}
           onAddNewTask={() => onOpenNewTask('Não Iniciado')}
+          readCommentsMap={readCommentsMap}
         />
 
         <TaskColumn
@@ -274,6 +322,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
           onStatusChange={onUpdateStatus}
           onViewDetails={handleViewDetails}
           onAddNewTask={() => onOpenNewTask('Em Desenvolvimento')}
+          readCommentsMap={readCommentsMap}
         />
 
         <TaskColumn
@@ -286,6 +335,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
           onStatusChange={onUpdateStatus}
           onViewDetails={handleViewDetails}
           onAddNewTask={() => onOpenNewTask('Finalizado')}
+          readCommentsMap={readCommentsMap}
         />
       </div>
 
@@ -312,8 +362,22 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
             setDetailTask(null);
           }}
           onTaskUpdated={() => onRefresh(true)}
+          onCommentsRead={handleCommentsRead}
         />
       )}
+
+      {/* Modal de Confirmação de Exclusão de Tarefa */}
+      <ConfirmModal
+        isOpen={taskToDeleteId !== null}
+        onClose={() => setTaskToDeleteId(null)}
+        onConfirm={handleConfirmDelete}
+        isLoading={isDeletingTask}
+        title="Excluir Tarefa"
+        description="Tem certeza que deseja excluir esta tarefa? Esta ação é definitiva e removerá todos os históricos, anexos e comentários vinculados."
+        confirmText="Excluir Tarefa"
+        cancelText="Cancelar"
+        variant="danger"
+      />
     </div>
   );
 };

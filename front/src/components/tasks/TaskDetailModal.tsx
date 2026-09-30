@@ -18,12 +18,14 @@ import {
   Calendar,
   AlertCircle,
   ExternalLink,
+  CheckCircle2,
 } from 'lucide-react';
 import { Task, TaskComment } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
+import { ConfirmModal } from '../ui/ConfirmModal';
 import { formatDate, getInitials } from '../../lib/utils';
 
 interface TaskDetailModalProps {
@@ -31,6 +33,7 @@ interface TaskDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   onTaskUpdated?: () => void;
+  onCommentsRead?: (taskId: number, total: number) => void;
 }
 
 export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
@@ -38,6 +41,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   isOpen,
   onClose,
   onTaskUpdated,
+  onCommentsRead,
 }) => {
   const { user: currentUser } = useAuth();
 
@@ -66,6 +70,24 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const commentsEndRef = useRef<HTMLDivElement>(null);
 
+  // Marcar comentários como lidos no localStorage e notificar parent
+  const markAsRead = (taskId: number, total: number) => {
+    if (currentUser) {
+      const key = `personal_tasks_read_comments_${currentUser.id_usuario}`;
+      try {
+        const stored = localStorage.getItem(key);
+        const map = stored ? JSON.parse(stored) : {};
+        map[taskId] = total;
+        localStorage.setItem(key, JSON.stringify(map));
+      } catch (e) {
+        console.error('Erro ao salvar leitura:', e);
+      }
+    }
+    if (onCommentsRead) {
+      onCommentsRead(taskId, total);
+    }
+  };
+
   useEffect(() => {
     setCurrentTask(task);
     if (task && isOpen) {
@@ -80,7 +102,9 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
       }
       const res = await api.get(`/tasks/${taskId}`);
       setCurrentTask(res.data);
-      setComments(res.data.comentarios || []);
+      const commentsList = res.data.comentarios || [];
+      setComments(commentsList);
+      markAsRead(taskId, commentsList.length);
     } catch (err) {
       console.error('Erro ao carregar detalhes da tarefa:', err);
     } finally {
@@ -89,6 +113,53 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
       }
     }
   };
+
+  // Capturar e anexar imagem direto da área de transferência (Printscreen / Recorte / Copy & Paste)
+  const handlePaste = (e: React.ClipboardEvent | ClipboardEvent) => {
+    const clipboardData = (e as any).clipboardData;
+    if (!clipboardData) return;
+
+    const items = clipboardData.items;
+    if (items) {
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.type.indexOf('image') !== -1) {
+          const file = item.getAsFile();
+          if (file) {
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            const ext = file.type.includes('png') ? 'png' : file.type.includes('jpeg') ? 'jpg' : 'png';
+            const renamedFile = new File([file], `printscreen-${timestamp}.${ext}`, {
+              type: file.type || 'image/png',
+            });
+            setSelectedFile(renamedFile);
+            e.preventDefault();
+            break;
+          }
+        }
+      }
+    }
+  };
+
+  // Listener global de paste no modal para capturar qualquer Ctrl+V de imagem
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const onGlobalPaste = (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf('image') !== -1) {
+          handlePaste(e);
+          break;
+        }
+      }
+    };
+
+    window.addEventListener('paste', onGlobalPaste);
+    return () => {
+      window.removeEventListener('paste', onGlobalPaste);
+    };
+  }, [isOpen]);
 
   // Polling silencioso em tempo real dos comentários e chat enquanto o modal estiver aberto
   useEffect(() => {
@@ -111,6 +182,18 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 
   const scrollToBottom = () => {
     commentsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  // Estados de confirmação padronizada (ConfirmModal)
+  const [commentToDeleteId, setCommentToDeleteId] = useState<number | null>(null);
+  const [isDeletingComment, setIsDeletingComment] = useState(false);
+  const [isUnshareModalOpen, setIsUnshareModalOpen] = useState(false);
+
+  // Toast interno para feedbacks e mensagens informativas
+  const [modalToast, setModalToast] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const showModalToast = (type: 'success' | 'error', text: string) => {
+    setModalToast({ type, text });
+    setTimeout(() => setModalToast(null), 3500);
   };
 
   // Enviar comentário/print/arquivo
@@ -143,7 +226,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
       if (onTaskUpdated) onTaskUpdated();
       setTimeout(scrollToBottom, 200);
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Erro ao enviar comentário.');
+      showModalToast('error', err.response?.data?.message || 'Erro ao enviar comentário.');
     } finally {
       setIsSubmitting(false);
     }
@@ -158,23 +241,32 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
       setEditingCommentId(null);
       setEditingText('');
       if (currentTask) await loadTaskDetails(currentTask.id_tarefa);
+      showModalToast('success', 'Mensagem atualizada com sucesso.');
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Erro ao salvar alteração.');
+      showModalToast('error', err.response?.data?.message || 'Erro ao salvar alteração.');
     }
   };
 
   // Excluir comentário
-  const handleDeleteComment = async (commentId: number) => {
-    if (confirm('Tem certeza que deseja excluir esta mensagem?')) {
-      try {
-        await api.delete(`/tasks/comments/${commentId}`);
-        if (currentTask) {
-          await loadTaskDetails(currentTask.id_tarefa);
-          if (onTaskUpdated) onTaskUpdated();
-        }
-      } catch (err: any) {
-        alert(err.response?.data?.message || 'Erro ao excluir mensagem.');
+  const handleDeleteComment = (commentId: number) => {
+    setCommentToDeleteId(commentId);
+  };
+
+  const handleConfirmDeleteComment = async () => {
+    if (!commentToDeleteId) return;
+    try {
+      setIsDeletingComment(true);
+      await api.delete(`/tasks/comments/${commentToDeleteId}`);
+      setCommentToDeleteId(null);
+      if (currentTask) {
+        await loadTaskDetails(currentTask.id_tarefa);
+        if (onTaskUpdated) onTaskUpdated();
       }
+      showModalToast('success', 'Mensagem excluída com sucesso.');
+    } catch (err: any) {
+      showModalToast('error', err.response?.data?.message || 'Erro ao excluir mensagem.');
+    } finally {
+      setIsDeletingComment(false);
     }
   };
 
@@ -199,28 +291,42 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
         navigator.clipboard.writeText(res.data.shareUrl);
         setIsCopied(true);
         setTimeout(() => setIsCopied(false), 3000);
+        showModalToast('success', 'Link copiado para a área de transferência!');
       }
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Erro ao compartilhar tarefa.');
+      showModalToast('error', err.response?.data?.message || 'Erro ao compartilhar tarefa.');
     } finally {
       setShareLoading(false);
     }
   };
 
-  // Revogar compartilhamento
-  const handleUnshareTask = async () => {
-    if (!currentTask) return;
-    if (confirm('Deseja revogar o compartilhamento? A tarefa voltará a ser privada.')) {
-      try {
-        setShareLoading(true);
-        await api.delete(`/tasks/${currentTask.id_tarefa}/share`);
-        await loadTaskDetails(currentTask.id_tarefa);
-        if (onTaskUpdated) onTaskUpdated();
-      } catch (err: any) {
-        alert(err.response?.data?.message || 'Erro ao revogar compartilhamento.');
-      } finally {
-        setShareLoading(false);
-      }
+  // Revogar compartilhamento (exclusivo para o responsável da tarefa)
+  const isOwner = Boolean(
+    currentTask?.isOwner ||
+    (currentUser?.id_usuario && Number(currentTask?.id_usuario) === Number(currentUser.id_usuario))
+  );
+
+  const handleUnshareTask = () => {
+    if (!currentTask || !isOwner) return;
+    setIsUnshareModalOpen(true);
+  };
+
+  const handleConfirmUnshare = async () => {
+    if (!currentTask || !isOwner) {
+      showModalToast('error', 'Apenas o responsável pela tarefa pode retirar o compartilhamento.');
+      return;
+    }
+    try {
+      setShareLoading(true);
+      await api.delete(`/tasks/${currentTask.id_tarefa}/share`);
+      setIsUnshareModalOpen(false);
+      await loadTaskDetails(currentTask.id_tarefa);
+      if (onTaskUpdated) onTaskUpdated();
+      showModalToast('success', 'Compartilhamento revogado. A tarefa agora é privada.');
+    } catch (err: any) {
+      showModalToast('error', err.response?.data?.message || 'Erro ao revogar compartilhamento.');
+    } finally {
+      setShareLoading(false);
     }
   };
 
@@ -234,7 +340,6 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 
   if (!isOpen || !currentTask) return null;
 
-  const isOwner = currentTask.id_usuario === currentUser?.id_usuario;
   const isPrivileged = currentUser?.role === 'ADMIN' || currentUser?.role === 'ROOT';
   const backendBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -322,7 +427,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                 </p>
               </div>
 
-              {currentTask.isCompartilhada && (
+              {currentTask.isCompartilhada && isOwner && (
                 <button
                   onClick={handleUnshareTask}
                   disabled={shareLoading}
@@ -365,6 +470,24 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
           </div>
         )}
 
+        {/* Feedback Toast Interno */}
+        {modalToast && (
+          <div
+            className={`mx-6 mt-3 p-3 rounded-xl border flex items-center gap-2.5 text-xs font-semibold animate-in fade-in duration-150 ${
+              modalToast.type === 'success'
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                : 'bg-rose-50 border-rose-200 text-rose-800'
+            }`}
+          >
+            {modalToast.type === 'success' ? (
+              <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+            ) : (
+              <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
+            )}
+            <span>{modalToast.text}</span>
+          </div>
+        )}
+
         {/* =====================================================
             CORPO DO MODAL - FEED ESTILO BLOG / CHAT
         ====================================================== */}
@@ -395,7 +518,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
               </p>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-3.5">
               {comments.map((comment) => {
                 const isCommentAuthor = comment.id_usuario === currentUser?.id_usuario;
                 const isEditing = editingCommentId === comment.id_comentario;
@@ -406,130 +529,177 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                     : `${backendBaseUrl}${comment.arquivo_url}`
                   : null;
 
-                return (
-                  <div
-                    key={comment.id_comentario}
-                    className={`rounded-2xl p-4 transition-all border ${
-                      isCommentAuthor
-                        ? 'bg-blue-50/40 border-blue-100'
-                        : 'bg-white border-slate-200/80 shadow-sm'
-                    }`}
-                  >
-                    {/* Cabeçalho do Post */}
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center space-x-2.5">
-                        <div className="h-8 w-8 rounded-full bg-slate-900 text-white font-bold text-xs flex items-center justify-center shadow-sm">
-                          {getInitials(comment.usuario?.nome || 'User')}
-                        </div>
-                        <div>
-                          <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                            <span>{comment.usuario?.nome || 'Usuário'}</span>
-                            {isCommentAuthor && (
-                              <span className="text-[10px] text-blue-600 bg-blue-100 px-1.5 py-0.2 rounded font-semibold">
-                                Você
-                              </span>
-                            )}
-                            {comment.usuario?.role === 'ROOT' && (
-                              <span className="text-[10px] text-amber-700 bg-amber-100 px-1 rounded font-bold">
-                                ROOT
-                              </span>
-                            )}
+                if (isCommentAuthor) {
+                  // MENSAGEM DO USUÁRIO LOGADO -> ALINHADA À DIREITA
+                  return (
+                    <div key={comment.id_comentario} className="flex justify-end w-full">
+                      <div className="max-w-[85%] sm:max-w-[75%] rounded-2xl rounded-tr-xs p-3.5 bg-blue-600 text-white shadow-sm border border-blue-700 text-left">
+                        {/* Header do balão */}
+                        <div className="flex items-center justify-between gap-3 mb-1.5 pb-1 border-b border-blue-500/50">
+                          <div className="flex items-center gap-1.5 text-xs text-blue-100">
+                            <span className="font-bold text-white">Você</span>
+                            <span className="text-[10px] text-blue-200">
+                              {formatDate(comment.data_criacao)}
+                            </span>
                           </div>
-                          <span className="text-[11px] text-slate-400">
+
+                          {/* Ações: Editar e Excluir */}
+                          <div className="flex items-center space-x-1">
+                            <button
+                              onClick={() => {
+                                setEditingCommentId(comment.id_comentario);
+                                setEditingText(comment.conteudo);
+                              }}
+                              title="Editar mensagem"
+                              className="p-1 text-blue-200 hover:text-white hover:bg-blue-700/60 rounded transition"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteComment(comment.id_comentario)}
+                              title="Excluir mensagem"
+                              className="p-1 text-blue-200 hover:text-rose-200 hover:bg-rose-600/40 rounded transition"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Conteúdo */}
+                        {isEditing ? (
+                          <div className="mt-2 space-y-2 text-slate-900">
+                            <textarea
+                              value={editingText}
+                              onChange={(e) => setEditingText(e.target.value)}
+                              className="w-full text-sm p-2.5 bg-white text-slate-900 rounded-xl focus:outline-none"
+                              rows={3}
+                            />
+                            <div className="flex items-center gap-2 justify-end">
+                              <button
+                                type="button"
+                                onClick={() => setEditingCommentId(null)}
+                                className="text-xs px-2.5 py-1 text-white hover:bg-blue-700 rounded-lg"
+                              >
+                                Cancelar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleSaveEditComment(comment.id_comentario)}
+                                className="text-xs px-3 py-1 bg-white text-blue-600 font-bold rounded-lg shadow-sm"
+                              >
+                                Salvar Alteração
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-sm text-white leading-relaxed whitespace-pre-wrap">
+                            {comment.conteudo}
+                          </p>
+                        )}
+
+                        {/* Imagem / Print anexado */}
+                        {comment.tipo === 'IMAGE' && fileUrl && (
+                          <div className="mt-2.5">
+                            <div
+                              onClick={() => setLightboxImage(fileUrl)}
+                              className="inline-block relative rounded-xl overflow-hidden border border-blue-400/40 cursor-pointer group max-w-sm"
+                            >
+                              <img
+                                src={fileUrl}
+                                alt={comment.arquivo_nome || 'Print da tarefa'}
+                                className="max-h-60 w-auto object-cover group-hover:scale-105 transition-transform duration-200"
+                              />
+                              <div className="absolute inset-0 bg-slate-900/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-semibold">
+                                Clique para ampliar
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Arquivo / Documento anexado */}
+                        {comment.tipo === 'FILE' && fileUrl && (
+                          <div className="mt-2.5">
+                            <a
+                              href={fileUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-blue-700/60 hover:bg-blue-700 text-xs font-medium text-white transition border border-blue-500/40"
+                            >
+                              <FileText className="w-3.5 h-3.5 text-blue-200" />
+                              <span className="font-semibold truncate">{comment.arquivo_nome || 'Arquivo Anexo'}</span>
+                              <ExternalLink className="w-3 h-3 text-blue-200" />
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                }
+
+                // MENSAGEM DE OUTROS USUÁRIOS -> ALINHADA À ESQUERDA
+                return (
+                  <div key={comment.id_comentario} className="flex justify-start w-full">
+                    <div className="max-w-[85%] sm:max-w-[75%] rounded-2xl rounded-tl-xs p-3.5 bg-white text-slate-900 shadow-xs border border-slate-200/90 text-left">
+                      {/* Header do balão */}
+                      <div className="flex items-center gap-2 mb-1.5 pb-1 border-b border-slate-100">
+                        <div className="h-6 w-6 rounded-full bg-slate-800 text-white font-bold text-[10px] flex items-center justify-center shrink-0 shadow-xs">
+                          {getInitials(comment.usuario?.nome || 'U')}
+                        </div>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-xs font-bold text-slate-900">
+                            {comment.usuario?.nome || 'Usuário'}
+                          </span>
+                          {comment.usuario?.role === 'ROOT' && (
+                            <span className="text-[9px] text-amber-700 bg-amber-100 px-1 rounded font-bold">
+                              ROOT
+                            </span>
+                          )}
+                          <span className="text-[10px] text-slate-400">
                             {formatDate(comment.data_criacao)}
                           </span>
                         </div>
                       </div>
 
-                      {/* Botões de Ação: EXCLUSIVOS PARA O AUTOR */}
-                      {isCommentAuthor && (
-                        <div className="flex items-center space-x-1">
-                          <button
-                            onClick={() => {
-                              setEditingCommentId(comment.id_comentario);
-                              setEditingText(comment.conteudo);
-                            }}
-                            title="Editar comentário"
-                            className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                      {/* Conteúdo */}
+                      <p className="text-sm text-slate-800 leading-relaxed whitespace-pre-wrap">
+                        {comment.conteudo}
+                      </p>
+
+                      {/* Imagem / Print anexado */}
+                      {comment.tipo === 'IMAGE' && fileUrl && (
+                        <div className="mt-2.5">
+                          <div
+                            onClick={() => setLightboxImage(fileUrl)}
+                            className="inline-block relative rounded-xl overflow-hidden border border-slate-200 cursor-pointer group max-w-sm"
                           >
-                            <Edit2 className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteComment(comment.id_comentario)}
-                            title="Excluir comentário"
-                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
+                            <img
+                              src={fileUrl}
+                              alt={comment.arquivo_nome || 'Print da tarefa'}
+                              className="max-h-60 w-auto object-cover group-hover:scale-105 transition-transform duration-200"
+                            />
+                            <div className="absolute inset-0 bg-slate-900/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-semibold">
+                              Clique para ampliar
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Arquivo / Documento anexado */}
+                      {comment.tipo === 'FILE' && fileUrl && (
+                        <div className="mt-2.5">
+                          <a
+                            href={fileUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200/80 border border-slate-200 text-xs font-medium text-slate-800 transition"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                            <FileText className="w-3.5 h-3.5 text-blue-600" />
+                            <span className="font-semibold truncate">{comment.arquivo_nome || 'Arquivo Anexo'}</span>
+                            <ExternalLink className="w-3 h-3 text-slate-400" />
+                          </a>
                         </div>
                       )}
                     </div>
-
-                    {/* Conteúdo da Mensagem */}
-                    {isEditing ? (
-                      <div className="mt-2 space-y-2">
-                        <textarea
-                          value={editingText}
-                          onChange={(e) => setEditingText(e.target.value)}
-                          className="w-full text-sm p-3 border border-blue-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:outline-none"
-                          rows={3}
-                        />
-                        <div className="flex items-center gap-2 justify-end">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => setEditingCommentId(null)}
-                          >
-                            Cancelar
-                          </Button>
-                          <Button
-                            size="sm"
-                            onClick={() => handleSaveEditComment(comment.id_comentario)}
-                          >
-                            Salvar Alteração
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="text-sm text-slate-800 leading-relaxed whitespace-pre-wrap pl-10">
-                        {comment.conteudo}
-                      </p>
-                    )}
-
-                    {/* Imagem / Print anexado */}
-                    {comment.tipo === 'IMAGE' && fileUrl && (
-                      <div className="mt-3 pl-10">
-                        <div
-                          onClick={() => setLightboxImage(fileUrl)}
-                          className="inline-block relative rounded-xl overflow-hidden border border-slate-200 cursor-pointer group max-w-sm"
-                        >
-                          <img
-                            src={fileUrl}
-                            alt={comment.arquivo_nome || 'Print da tarefa'}
-                            className="max-h-60 w-auto object-cover group-hover:scale-105 transition-transform duration-200"
-                          />
-                          <div className="absolute inset-0 bg-slate-900/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-semibold">
-                            Clique para ampliar
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Arquivo / Documento anexado */}
-                    {comment.tipo === 'FILE' && fileUrl && (
-                      <div className="mt-3 pl-10">
-                        <a
-                          href={fileUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-2.5 px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200/80 border border-slate-200/80 text-xs font-medium text-slate-800 transition"
-                        >
-                          <FileText className="w-4 h-4 text-blue-600" />
-                          <span className="font-semibold">{comment.arquivo_nome || 'Arquivo Anexo'}</span>
-                          <ExternalLink className="w-3 h-3 text-slate-400" />
-                        </a>
-                      </div>
-                    )}
                   </div>
                 );
               })}
@@ -543,17 +713,33 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
         ====================================================== */}
         <div className="p-4 border-t border-slate-100 bg-slate-50/50">
           {selectedFile && (
-            <div className="mb-2 p-2 bg-blue-50 border border-blue-200 rounded-xl flex items-center justify-between text-xs text-blue-900">
-              <div className="flex items-center gap-2 truncate">
+            <div className="mb-2 p-2 bg-blue-50 border border-blue-200 rounded-xl flex items-center justify-between text-xs text-blue-900 animate-in fade-in duration-200">
+              <div className="flex items-center gap-2.5 truncate">
                 {selectedFile.type.startsWith('image/') ? (
-                  <ImageIcon className="w-4 h-4 text-blue-600" />
+                  <div className="flex items-center gap-2 truncate">
+                    <img
+                      src={URL.createObjectURL(selectedFile)}
+                      alt="Print colado"
+                      className="h-10 w-10 object-cover rounded-lg border border-blue-300 shadow-2xs shrink-0"
+                    />
+                    <div className="truncate text-left">
+                      <span className="font-bold block truncate text-slate-800">{selectedFile.name}</span>
+                      <span className="text-blue-700 text-[10px] font-semibold flex items-center gap-1">
+                        <Check className="w-3 h-3 text-emerald-600" /> Imagem/Print pronta para envio ({(selectedFile.size / 1024).toFixed(0)} KB)
+                      </span>
+                    </div>
+                  </div>
                 ) : (
-                  <FileText className="w-4 h-4 text-blue-600" />
+                  <div className="flex items-center gap-2 truncate">
+                    <FileText className="w-5 h-5 text-blue-600 shrink-0" />
+                    <div className="truncate text-left">
+                      <span className="font-medium truncate text-slate-800">{selectedFile.name}</span>
+                      <span className="text-slate-400 text-[10px] block">
+                        ({(selectedFile.size / 1024).toFixed(0)} KB)
+                      </span>
+                    </div>
+                  </div>
                 )}
-                <span className="font-medium truncate">{selectedFile.name}</span>
-                <span className="text-slate-400 text-[10px]">
-                  ({(selectedFile.size / 1024).toFixed(0)} KB)
-                </span>
               </div>
               <button
                 type="button"
@@ -561,7 +747,8 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                   setSelectedFile(null);
                   if (fileInputRef.current) fileInputRef.current.value = '';
                 }}
-                className="text-rose-500 hover:text-rose-700 font-bold p-1"
+                className="text-slate-400 hover:text-rose-600 p-1.5 rounded-lg hover:bg-white transition"
+                title="Remover anexo"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -584,8 +771,8 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              title="Anexar print, imagem ou arquivo"
-              className="p-3 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-xl border border-slate-200 bg-white transition"
+              title="Anexar arquivo ou colar printscreen (Ctrl+V)"
+              className="p-3 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-xl border border-slate-200 bg-white transition shrink-0"
             >
               <Paperclip className="w-5 h-5" />
             </button>
@@ -594,7 +781,8 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
               <textarea
                 value={newCommentText}
                 onChange={(e) => setNewCommentText(e.target.value)}
-                placeholder="Escreva uma mensagem, atualização ou cole instruções sobre a tarefa..."
+                onPaste={handlePaste}
+                placeholder="Escreva uma mensagem ou cole uma imagem/print (Ctrl+V)..."
                 className="w-full text-sm p-3 bg-white rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 resize-none"
                 rows={2}
                 onKeyDown={(e) => {
@@ -610,7 +798,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
               type="submit"
               disabled={(!newCommentText.trim() && !selectedFile) || isSubmitting}
               isLoading={isSubmitting}
-              className="h-[50px] px-5"
+              className="h-[50px] px-5 shrink-0"
             >
               <Send className="w-4 h-4" />
             </Button>
@@ -639,6 +827,32 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
           </div>
         </div>
       )}
+
+      {/* Modal de Confirmação: Excluir Comentário */}
+      <ConfirmModal
+        isOpen={commentToDeleteId !== null}
+        onClose={() => setCommentToDeleteId(null)}
+        onConfirm={handleConfirmDeleteComment}
+        isLoading={isDeletingComment}
+        title="Excluir Mensagem"
+        description="Tem certeza que deseja excluir esta mensagem do histórico da tarefa?"
+        confirmText="Excluir Mensagem"
+        cancelText="Cancelar"
+        variant="danger"
+      />
+
+      {/* Modal de Confirmação: Revogar Compartilhamento */}
+      <ConfirmModal
+        isOpen={isUnshareModalOpen}
+        onClose={() => setIsUnshareModalOpen(false)}
+        onConfirm={handleConfirmUnshare}
+        isLoading={shareLoading}
+        title="Revogar Compartilhamento"
+        description="Deseja revogar o link de compartilhamento? A tarefa voltará a ser privada e os usuários convidados perderão o acesso."
+        confirmText="Revogar Acesso"
+        cancelText="Cancelar"
+        variant="warning"
+      />
     </div>
   );
 };

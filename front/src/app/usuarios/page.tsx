@@ -20,10 +20,13 @@ import {
   ShieldCheck,
   Crown,
   CheckCircle,
+  CheckCircle2,
+  AlertCircle,
   XCircle,
   ShieldAlert,
   ArrowLeft,
 } from 'lucide-react';
+import { ConfirmModal } from '../../components/ui/ConfirmModal';
 import { formatDate, getInitials } from '../../lib/utils';
 
 export default function UsuariosPage() {
@@ -36,6 +39,15 @@ export default function UsuariosPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [actionLoadingId, setActionLoadingId] = useState<number | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  const [userToDelete, setUserToDelete] = useState<{ id: number; nome: string } | null>(null);
+  const [isDeletingUser, setIsDeletingUser] = useState(false);
+  const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const showToast = (type: 'success' | 'error', text: string) => {
+    setToastMessage({ type, text });
+    setTimeout(() => setToastMessage(null), 3500);
+  };
 
   const isPrivileged = currentUser?.role === 'ADMIN' || currentUser?.role === 'ROOT';
   const isRoot = currentUser?.role === 'ROOT';
@@ -75,9 +87,10 @@ export default function UsuariosPage() {
     try {
       setActionLoadingId(id);
       await api.patch(`/usuarios/${id}/status`);
+      showToast('success', 'Status do usuário atualizado com sucesso!');
       await fetchUsers();
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Erro ao alterar status do usuário.');
+      showToast('error', err.response?.data?.message || 'Erro ao alterar status do usuário.');
     } finally {
       setActionLoadingId(null);
     }
@@ -88,31 +101,33 @@ export default function UsuariosPage() {
     try {
       setActionLoadingId(id);
       await api.patch(`/usuarios/${id}/role`, { role: newRole });
+      showToast('success', 'Cargo do usuário atualizado com sucesso!');
       await fetchUsers();
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Erro ao alterar cargo do usuário.');
+      showToast('error', err.response?.data?.message || 'Erro ao alterar cargo do usuário.');
     } finally {
       setActionLoadingId(null);
     }
   };
 
-  // Excluir usuário
-  const handleDeleteUser = async (id: number, nome: string) => {
-    if (
-      confirm(
-        `Tem certeza que deseja excluir o usuário "${nome}"? Todas as tarefas vinculadas a ele também serão excluídas.`
-      )
-    ) {
-      try {
-        setActionLoadingId(id);
-        await api.delete(`/usuarios/${id}`);
-        await fetchUsers();
-      } catch (err: any) {
-        alert(err.response?.data?.message || 'Erro ao excluir usuário.');
-      } finally {
-        setActionLoadingId(null);
-      }
+  // Confirmar exclusão de usuário
+  const handleConfirmDelete = async () => {
+    if (!userToDelete) return;
+    try {
+      setIsDeletingUser(true);
+      await api.delete(`/usuarios/${userToDelete.id}`);
+      showToast('success', `Usuário "${userToDelete.nome}" excluído com sucesso.`);
+      setUserToDelete(null);
+      await fetchUsers();
+    } catch (err: any) {
+      showToast('error', err.response?.data?.message || 'Erro ao excluir usuário.');
+    } finally {
+      setIsDeletingUser(false);
     }
+  };
+
+  const handleDeleteUser = (id: number, nome: string) => {
+    setUserToDelete({ id, nome });
   };
 
   const filteredUsers = users.filter(
@@ -404,6 +419,36 @@ export default function UsuariosPage() {
           onClose={() => setIsUserModalOpen(false)}
           onSuccess={fetchUsers}
         />
+      )}
+
+      {/* Modal de Confirmação para Excluir Usuário */}
+      <ConfirmModal
+        isOpen={!!userToDelete}
+        onClose={() => setUserToDelete(null)}
+        onConfirm={handleConfirmDelete}
+        title="Excluir Usuário"
+        description={`Tem certeza que deseja excluir o usuário "${userToDelete?.nome}"? Todas as tarefas vinculadas a ele também serão excluídas.`}
+        confirmText="Excluir Usuário"
+        variant="danger"
+        isLoading={isDeletingUser}
+      />
+
+      {/* Toast Informativo / Feedback */}
+      {toastMessage && (
+        <div
+          className={`fixed bottom-6 right-6 z-50 flex items-center gap-2.5 px-4 py-3 rounded-xl shadow-lg border text-sm font-semibold animate-in fade-in slide-in-from-bottom-3 duration-200 ${
+            toastMessage.type === 'success'
+              ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+              : 'bg-rose-50 border-rose-200 text-rose-800'
+          }`}
+        >
+          {toastMessage.type === 'success' ? (
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+          ) : (
+            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+          )}
+          <span>{toastMessage.text}</span>
+        </div>
       )}
     </div>
   );

@@ -405,11 +405,10 @@ export class TasksService {
 
   async unshareTask(id: number, currentUser: { id_usuario: number; role: string }) {
     const task = await this.findOne(id);
-    const isPrivileged = currentUser.role === 'ADMIN' || currentUser.role === 'ROOT';
-    const isOwner = task.id_usuario === currentUser.id_usuario;
+    const isOwner = Number(task.id_usuario) === Number(currentUser.id_usuario);
 
-    if (!isPrivileged && !isOwner) {
-      throw new ForbiddenException('Apenas o proprietário da tarefa ou administradores podem revogar o compartilhamento.');
+    if (!isOwner) {
+      throw new ForbiddenException('Apenas o responsável pela tarefa pode retirar o compartilhamento.');
     }
 
     await this.prisma.tarefa.update({

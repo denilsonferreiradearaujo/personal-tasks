@@ -15,6 +15,7 @@ interface TaskColumnProps {
   onStatusChange: (id: number, newStatus: TaskStatus) => void;
   onAddNewTask?: () => void;
   onViewDetails?: (task: Task) => void;
+  readCommentsMap?: { [taskId: number]: number };
 }
 
 export const TaskColumn: React.FC<TaskColumnProps> = ({
@@ -27,6 +28,7 @@ export const TaskColumn: React.FC<TaskColumnProps> = ({
   onStatusChange,
   onAddNewTask,
   onViewDetails,
+  readCommentsMap,
 }) => {
   return (
     <div className="flex flex-col rounded-2xl bg-slate-100/70 border border-slate-200/80 p-4 h-full min-h-[500px]">
@@ -58,16 +60,23 @@ export const TaskColumn: React.FC<TaskColumnProps> = ({
             <p className="text-xs font-medium text-slate-400">Nenhuma tarefa nesta etapa</p>
           </div>
         ) : (
-          tasks.map((task) => (
-            <TaskCard
-              key={task.id_tarefa}
-              task={task}
-              onEdit={onEditTask}
-              onDelete={onDeleteTask}
-              onStatusChange={onStatusChange}
-              onViewDetails={onViewDetails}
-            />
-          ))
+          tasks.map((task) => {
+            const isUnread =
+              (task.totalComentarios || 0) > 0 &&
+              (task.totalComentarios || 0) > (readCommentsMap?.[task.id_tarefa] || 0);
+
+            return (
+              <TaskCard
+                key={task.id_tarefa}
+                task={task}
+                onEdit={onEditTask}
+                onDelete={onDeleteTask}
+                onStatusChange={onStatusChange}
+                onViewDetails={onViewDetails}
+                isUnread={isUnread}
+              />
+            );
+          })
         )}
       </div>
     </div>
