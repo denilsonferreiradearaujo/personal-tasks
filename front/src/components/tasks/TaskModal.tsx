@@ -32,9 +32,20 @@ export const TaskModal: React.FC<TaskModalProps> = ({
   const [equipe, setEquipe] = useState('');
   const [idUsuario, setIdUsuario] = useState<number | string>(currentUser?.id_usuario || '');
   const [prioridade, setPrioridade] = useState('baixa');
-  const [status, setStatus] = useState(defaultStatus);
+  const [status, setStatus] = useState('Não Iniciado');
+  const [dataPrevisaoInicio, setDataPrevisaoInicio] = useState('');
+  const [dataPrevisaoFim, setDataPrevisaoFim] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const formatDateForInput = (d?: string) => {
+    if (!d) return '';
+    try {
+      return new Date(d).toISOString().split('T')[0];
+    } catch {
+      return '';
+    }
+  };
 
   // Carregar lista de usuários para seleção apenas para Admin/Root
   useEffect(() => {
@@ -56,7 +67,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
     }
   }, [isOpen, isAdmin, currentUser]);
 
-  // Preencher dados ao editar
+  // Preencher dados ao editar ou abrir novo
   useEffect(() => {
     if (taskToEdit) {
       setDescricao(taskToEdit.descricao);
@@ -64,15 +75,21 @@ export const TaskModal: React.FC<TaskModalProps> = ({
       setIdUsuario(taskToEdit.id_usuario);
       setPrioridade((taskToEdit.prioridade || 'baixa').toLowerCase());
       setStatus(taskToEdit.status || 'Não Iniciado');
+      setDataPrevisaoInicio(formatDateForInput(taskToEdit.data_previsao_inicio || taskToEdit.data_cadastro));
+      setDataPrevisaoFim(formatDateForInput(taskToEdit.data_previsao_fim));
     } else {
       setDescricao('');
       setEquipe('');
       setPrioridade('baixa');
-      setStatus(defaultStatus);
+      setStatus('Não Iniciado');
       setIdUsuario(currentUser?.id_usuario || '');
+      const today = new Date().toISOString().split('T')[0];
+      const next3 = new Date(Date.now() + 3 * 86400000).toISOString().split('T')[0];
+      setDataPrevisaoInicio(today);
+      setDataPrevisaoFim(next3);
     }
     setError(null);
-  }, [taskToEdit, isOpen, defaultStatus, currentUser]);
+  }, [taskToEdit, isOpen, currentUser]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -95,12 +112,14 @@ export const TaskModal: React.FC<TaskModalProps> = ({
     setError(null);
 
     try {
-      const payload = {
+      const payload: any = {
         descricao: descricao.trim(),
         equipe: equipe.trim(),
         id_usuario: resolvedUserId,
         prioridade,
-        status,
+        status: taskToEdit ? status : 'Não Iniciado',
+        data_previsao_inicio: dataPrevisaoInicio ? new Date(dataPrevisaoInicio).toISOString() : undefined,
+        data_previsao_fim: dataPrevisaoFim ? new Date(dataPrevisaoFim).toISOString() : undefined,
       };
 
       if (taskToEdit) {
@@ -187,28 +206,59 @@ export const TaskModal: React.FC<TaskModalProps> = ({
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-3">
-          {/* Prioridade */}
-          <Select
-            label="Prioridade"
-            value={prioridade}
-            onChange={(e) => setPrioridade(e.target.value)}
-          >
-            <option value="baixa">Baixa</option>
-            <option value="média">Média</option>
-            <option value="alta">Alta</option>
-          </Select>
+        {/* Prioridade e Status (Status apenas na edição) */}
+        {taskToEdit ? (
+          <div className="grid grid-cols-2 gap-3">
+            <Select
+              label="Prioridade"
+              value={prioridade}
+              onChange={(e) => setPrioridade(e.target.value)}
+            >
+              <option value="baixa">Baixa</option>
+              <option value="média">Média</option>
+              <option value="alta">Alta</option>
+            </Select>
 
-          {/* Status */}
-          <Select
-            label="Status"
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-          >
-            <option value="Não Iniciado">Não Iniciado</option>
-            <option value="Em Desenvolvimento">Em Desenvolvimento</option>
-            <option value="Finalizado">Finalizado</option>
-          </Select>
+            <Select
+              label="Status"
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+            >
+              <option value="Não Iniciado">Não Iniciado</option>
+              <option value="Em Desenvolvimento">Em Desenvolvimento</option>
+              <option value="Finalizado">Finalizado</option>
+            </Select>
+          </div>
+        ) : (
+          <div>
+            <Select
+              label="Prioridade"
+              value={prioridade}
+              onChange={(e) => setPrioridade(e.target.value)}
+            >
+              <option value="baixa">Baixa</option>
+              <option value="média">Média</option>
+              <option value="alta">Alta</option>
+            </Select>
+          </div>
+        )}
+
+        {/* Datas do Cronograma (Planejamento) */}
+        <div className="grid grid-cols-2 gap-3">
+          <Input
+            type="date"
+            label="Previsão de Início *"
+            required
+            value={dataPrevisaoInicio}
+            onChange={(e) => setDataPrevisaoInicio(e.target.value)}
+          />
+          <Input
+            type="date"
+            label="Previsão de Término *"
+            required
+            value={dataPrevisaoFim}
+            onChange={(e) => setDataPrevisaoFim(e.target.value)}
+          />
         </div>
 
         {/* Actions */}

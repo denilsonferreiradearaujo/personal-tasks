@@ -201,27 +201,38 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
     setDragOverIndex(null);
   };
 
-  const handleColumnDrop = async (e: React.DragEvent, targetStatus: TaskStatus) => {
-    e.preventDefault();
-    if (!draggedTask) return;
+  // Controle de confirmação de retrocesso de tarefas
+  const [retrocessionConfirmation, setRetrocessionConfirmation] = useState<{
+    task: Task;
+    fromStatus: TaskStatus;
+    targetStatus: TaskStatus;
+    toIndex: number | null;
+  } | null>(null);
 
-    const fromStatus = draggedFromStatus;
-    const task = draggedTask;
-    const toIndex = dragOverIndex;
+  const getStatusRank = (status?: string | null) => {
+    const s = normalizeStatus(status || '');
+    if (s.includes('finalizado') || s.includes('conclu') || s.includes('entregue')) return 2;
+    if (s.includes('desenvolvimento') || s.includes('progresso') || s.includes('andamento')) return 1;
+    return 0; // Não Iniciado
+  };
 
-    handleCardDragEnd();
+  const getColumnList = (status: TaskStatus) => {
+    const s = normalizeStatus(status);
+    if (s.includes('desenvolvimento') || s.includes('progresso') || s.includes('andamento')) {
+      return [...sortedEmDesenvolvimento];
+    }
+    if (s.includes('finalizado') || s.includes('conclu') || s.includes('entregue')) {
+      return [...sortedFinalizado];
+    }
+    return [...sortedNaoIniciado];
+  };
 
-    const getColumnList = (status: TaskStatus) => {
-      const s = normalizeStatus(status);
-      if (s.includes('desenvolvimento') || s.includes('progresso') || s.includes('andamento')) {
-        return [...sortedEmDesenvolvimento];
-      }
-      if (s.includes('finalizado') || s.includes('conclu') || s.includes('entregue')) {
-        return [...sortedFinalizado];
-      }
-      return [...sortedNaoIniciado];
-    };
-
+  const executeStatusMove = async (
+    task: Task,
+    fromStatus: TaskStatus,
+    targetStatus: TaskStatus,
+    toIndex: number | null
+  ) => {
     try {
       if (fromStatus === targetStatus) {
         // Reordenação dentro da mesma coluna
@@ -271,6 +282,36 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
       console.error('Erro ao reordenar/mover tarefa:', err);
       showBoardToast('error', err.response?.data?.message || 'Erro ao sincronizar a nova ordem.');
     }
+  };
+
+  const handleColumnDrop = async (e: React.DragEvent, targetStatus: TaskStatus) => {
+    e.preventDefault();
+    if (!draggedTask) return;
+
+    const fromStatus = draggedFromStatus || draggedTask.status;
+    const task = draggedTask;
+    const toIndex = dragOverIndex;
+
+    handleCardDragEnd();
+
+    // Verificação de retrocesso no ciclo de vida
+    if (fromStatus !== targetStatus) {
+      const sourceRank = getStatusRank(fromStatus);
+      const targetRank = getStatusRank(targetStatus);
+
+      if (targetRank < sourceRank) {
+        // Intercepta e solicita confirmação do usuário
+        setRetrocessionConfirmation({
+          task,
+          fromStatus,
+          targetStatus,
+          toIndex,
+        });
+        return;
+      }
+    }
+
+    await executeStatusMove(task, fromStatus, targetStatus, toIndex);
   };
 
   const handleEditClick = (task: Task) => {
@@ -333,6 +374,10 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
           'Equipe / Squad': t.equipe,
           'Prioridade': (t.prioridade || '').toUpperCase(),
           'Status': t.status,
+          'Previsão de Início': t.data_previsao_inicio ? formatDate(t.data_previsao_inicio) : '—',
+          'Data de Início': t.data_inicio ? formatDate(t.data_inicio) : '—',
+          'Previsão de Término': t.data_previsao_fim ? formatDate(t.data_previsao_fim) : '—',
+          'Data de Conclusão': t.data_conclusao ? formatDate(t.data_conclusao) : 'Pendente',
           'Responsável / Criador': t.nome || 'Não atribuído',
           'E-mail': t.email || '',
           'Tipo de Acesso': privacyLabel,
@@ -349,11 +394,15 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
         { wch: 18 }, // Equipe
         { wch: 14 }, // Prioridade
         { wch: 22 }, // Status
+        { wch: 20 }, // Previsão de Início
+        { wch: 20 }, // Data de Início
+        { wch: 20 }, // Previsão de Término
+        { wch: 20 }, // Data de Conclusão
         { wch: 24 }, // Responsável
         { wch: 28 }, // E-mail
         { wch: 26 }, // Tipo de Acesso
         { wch: 24 }, // Comentários
-        { wch: 20 }, // Data
+        { wch: 20 }, // Data de Cadastro
       ];
 
       const workbook = XLSX.utils.book_new();
@@ -555,7 +604,6 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
           onDeleteTask={handleDeleteClick}
           onStatusChange={onUpdateStatus}
           onViewDetails={handleViewDetails}
-          onAddNewTask={() => onOpenNewTask('Em Desenvolvimento')}
           readCommentsMap={readCommentsMap}
           onCardDragStart={handleCardDragStart}
           onCardDragOver={handleCardDragOver}
@@ -576,7 +624,6 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
           onDeleteTask={handleDeleteClick}
           onStatusChange={onUpdateStatus}
           onViewDetails={handleViewDetails}
-          onAddNewTask={() => onOpenNewTask('Finalizado')}
           readCommentsMap={readCommentsMap}
           onCardDragStart={handleCardDragStart}
           onCardDragOver={handleCardDragOver}
@@ -626,6 +673,24 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
         confirmText="Excluir Tarefa"
         cancelText="Cancelar"
         variant="danger"
+      />
+
+      {/* Modal de Confirmação de Retrocesso de Tarefa */}
+      <ConfirmModal
+        isOpen={retrocessionConfirmation !== null}
+        onClose={() => setRetrocessionConfirmation(null)}
+        onConfirm={async () => {
+          if (retrocessionConfirmation) {
+            const { task, fromStatus, targetStatus, toIndex } = retrocessionConfirmation;
+            setRetrocessionConfirmation(null);
+            await executeStatusMove(task, fromStatus, targetStatus, toIndex);
+          }
+        }}
+        title="Retroceder Tarefa"
+        description="Realmente deseja retroceder essa tarefa? Isso acarretará em alterações de datas na sua base de dados histórica."
+        confirmText="Sim, Retroceder"
+        cancelText="Cancelar"
+        variant="warning"
       />
 
       {/* Toast Feedback */}

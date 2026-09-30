@@ -51,6 +51,10 @@ export interface Task {
   isCompartilhada?: boolean;
   shareToken?: string;
   data_cadastro?: string;
+  data_previsao_inicio?: string;
+  data_inicio?: string;
+  data_previsao_fim?: string;
+  data_conclusao?: string;
   nome?: string; // Nome do criador
   email?: string;
   totalComentarios?: number;

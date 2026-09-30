@@ -34,15 +34,28 @@ export class TasksService {
     // Gera um shareToken único por padrão para caso a tarefa seja compartilhada
     const shareToken = crypto.randomBytes(16).toString('hex');
 
+    // Toda nova tarefa inicia obrigatoriamente como "Não Iniciado"
+    const status = 'Não Iniciado';
+    const dtPrevisaoInicio = createTaskDto.data_previsao_inicio
+      ? new Date(createTaskDto.data_previsao_inicio)
+      : (createTaskDto.data_inicio ? new Date(createTaskDto.data_inicio) : new Date());
+    const dtPrevisaoFim = createTaskDto.data_previsao_fim
+      ? new Date(createTaskDto.data_previsao_fim)
+      : new Date(dtPrevisaoInicio.getTime() + 3 * 24 * 60 * 60 * 1000);
+
     const task = await this.prisma.tarefa.create({
       data: {
         id_usuario: targetUserId,
         descricao: createTaskDto.descricao,
         equipe: createTaskDto.equipe,
         prioridade: createTaskDto.prioridade.toLowerCase(),
-        status: createTaskDto.status || 'Não Iniciado',
+        status,
         isCompartilhada: false, // Inicialmente privada do criador!
         shareToken,
+        data_previsao_inicio: dtPrevisaoInicio,
+        data_inicio: null, // Data real só é registrada quando o status muda para "Em Desenvolvimento"
+        data_previsao_fim: dtPrevisaoFim,
+        data_conclusao: null, // Data real só é registrada quando o status muda para "Finalizado"
       },
       include: {
         usuario: {
@@ -147,6 +160,9 @@ export class TasksService {
           ? t.ordensPessoais[0].posicao
           : null;
 
+      const dtPrevisaoInicio = t.data_previsao_inicio || t.data_cadastro;
+      const dtPrevisaoFim = t.data_previsao_fim || new Date(new Date(dtPrevisaoInicio).getTime() + 3 * 24 * 60 * 60 * 1000);
+
       return {
         id_tarefa: t.id_tarefa,
         id_usuario: t.id_usuario,
@@ -159,6 +175,10 @@ export class TasksService {
         isCompartilhada: t.isCompartilhada,
         shareToken: t.shareToken,
         data_cadastro: t.data_cadastro,
+        data_previsao_inicio: dtPrevisaoInicio,
+        data_inicio: t.data_inicio,
+        data_previsao_fim: dtPrevisaoFim,
+        data_conclusao: t.data_conclusao,
         nome: t.usuario?.nome || 'Não atribuído',
         email: t.usuario?.email || '',
         totalComentarios: t._count.comentarios,
@@ -251,6 +271,9 @@ export class TasksService {
       }
     }
 
+    const dtPrevisaoInicio = task.data_previsao_inicio || task.data_cadastro;
+    const dtPrevisaoFim = task.data_previsao_fim || new Date(new Date(dtPrevisaoInicio).getTime() + 3 * 24 * 60 * 60 * 1000);
+
     return {
       id_tarefa: task.id_tarefa,
       id_usuario: task.id_usuario,
@@ -261,6 +284,10 @@ export class TasksService {
       isCompartilhada: task.isCompartilhada,
       shareToken: task.shareToken,
       data_cadastro: task.data_cadastro,
+      data_previsao_inicio: dtPrevisaoInicio,
+      data_inicio: task.data_inicio,
+      data_previsao_fim: dtPrevisaoFim,
+      data_conclusao: task.data_conclusao,
       nome: task.usuario?.nome || 'Não atribuído',
       email: task.usuario?.email || '',
       comentarios: task.comentarios,
@@ -292,6 +319,18 @@ export class TasksService {
     if (data.prioridade) {
       data.prioridade = data.prioridade.toLowerCase();
     }
+    if (data.data_previsao_inicio !== undefined) {
+      data.data_previsao_inicio = data.data_previsao_inicio ? new Date(data.data_previsao_inicio) : null;
+    }
+    if (data.data_inicio !== undefined) {
+      data.data_inicio = data.data_inicio ? new Date(data.data_inicio) : null;
+    }
+    if (data.data_previsao_fim !== undefined) {
+      data.data_previsao_fim = data.data_previsao_fim ? new Date(data.data_previsao_fim) : null;
+    }
+    if (data.data_conclusao !== undefined) {
+      data.data_conclusao = data.data_conclusao ? new Date(data.data_conclusao) : null;
+    }
 
     const updated = await this.prisma.tarefa.update({
       where: { id_tarefa: id },
@@ -307,6 +346,9 @@ export class TasksService {
       },
     });
 
+    const dtPrevisaoInicio = updated.data_previsao_inicio || updated.data_cadastro;
+    const dtPrevisaoFim = updated.data_previsao_fim || new Date(new Date(dtPrevisaoInicio).getTime() + 3 * 24 * 60 * 60 * 1000);
+
     return {
       id_tarefa: updated.id_tarefa,
       id_usuario: updated.id_usuario,
@@ -317,27 +359,99 @@ export class TasksService {
       isCompartilhada: updated.isCompartilhada,
       shareToken: updated.shareToken,
       data_cadastro: updated.data_cadastro,
+      data_previsao_inicio: dtPrevisaoInicio,
+      data_inicio: updated.data_inicio,
+      data_previsao_fim: dtPrevisaoFim,
+      data_conclusao: updated.data_conclusao,
       nome: updated.usuario?.nome || 'Não atribuído',
     };
   }
 
   async updateStatus(id: number, rawStatus: string) {
-    await this.findOne(id);
+    const task = await this.findOne(id);
 
     let status = rawStatus;
     const s = rawStatus.toLowerCase().trim();
     if (s.includes('não') || s.includes('nao')) {
       status = 'Não Iniciado';
-    } else if (s.includes('desenvolvimento') || s.includes('progresso')) {
+    } else if (s.includes('desenvolvimento') || s.includes('progresso') || s.includes('andamento')) {
       status = 'Em Desenvolvimento';
     } else if (s.includes('final') || s.includes('conclu')) {
       status = 'Finalizado';
     }
 
+    const data: any = { status };
+
+    if (status === 'Em Desenvolvimento') {
+      // Ao entrar em desenvolvimento: registra data real de início se ainda não existir
+      if (!task.data_inicio) {
+        data.data_inicio = new Date();
+      }
+      // Se estava finalizada e reabriu, zera a data de conclusão
+      data.data_conclusao = null;
+    } else if (status === 'Finalizado') {
+      // Ao finalizar: registra a data de conclusão real
+      data.data_conclusao = new Date();
+      // Se não tiver data de início registrada, preenche com a previsão de início ou cadastro
+      if (!task.data_inicio) {
+        data.data_inicio = task.data_previsao_inicio || task.data_cadastro || new Date();
+      }
+    } else if (status === 'Não Iniciado') {
+      // Ao retroceder para 'Não Iniciado', reseta início e conclusão reais
+      data.data_inicio = null;
+      data.data_conclusao = null;
+    }
+
     return this.prisma.tarefa.update({
       where: { id_tarefa: id },
-      data: { status },
+      data,
     });
+  }
+
+  async updateTimeline(
+    id: number,
+    dto: { data_previsao_inicio?: string; data_inicio?: string; data_previsao_fim?: string; data_conclusao?: string },
+    currentUser?: { id_usuario: number; email: string; role: string },
+  ) {
+    await this.findOne(id, currentUser);
+
+    const data: any = {};
+    if (dto.data_previsao_inicio) {
+      data.data_previsao_inicio = new Date(dto.data_previsao_inicio);
+    }
+    if (dto.data_inicio !== undefined) {
+      data.data_inicio = dto.data_inicio ? new Date(dto.data_inicio) : null;
+    }
+    if (dto.data_previsao_fim) {
+      data.data_previsao_fim = new Date(dto.data_previsao_fim);
+    }
+    if (dto.data_conclusao !== undefined) {
+      data.data_conclusao = dto.data_conclusao ? new Date(dto.data_conclusao) : null;
+    }
+
+    const updated = await this.prisma.tarefa.update({
+      where: { id_tarefa: id },
+      data,
+      include: {
+        usuario: {
+          select: {
+            id_usuario: true,
+            nome: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    const dtPrevisaoInicio = updated.data_previsao_inicio || updated.data_cadastro;
+    const dtPrevisaoFim = updated.data_previsao_fim || new Date(new Date(dtPrevisaoInicio).getTime() + 3 * 24 * 60 * 60 * 1000);
+
+    return {
+      ...updated,
+      data_previsao_inicio: dtPrevisaoInicio,
+      data_previsao_fim: dtPrevisaoFim,
+      nome: updated.usuario?.nome || 'Não atribuído',
+    };
   }
 
   async remove(id: number, currentUser?: { id_usuario: number; role: string }) {

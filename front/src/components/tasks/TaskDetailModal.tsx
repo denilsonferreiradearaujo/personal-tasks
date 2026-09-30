@@ -19,6 +19,7 @@ import {
   AlertCircle,
   ExternalLink,
   CheckCircle2,
+  Clock,
 } from 'lucide-react';
 import { Task, TaskComment } from '../../types';
 import { useAuth } from '../../context/AuthContext';
@@ -376,15 +377,27 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
               {currentTask.descricao}
             </h2>
 
-            <div className="flex items-center gap-4 text-xs text-slate-500 pt-1">
+            <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500 pt-1">
               <span className="flex items-center gap-1">
                 <Users className="w-3.5 h-3.5 text-slate-400" />
                 Criada por: <strong>{currentTask.nome || 'Desconhecido'}</strong>
               </span>
               <span className="flex items-center gap-1">
                 <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                {formatDate(currentTask.data_cadastro)}
+                Criada em: {formatDate(currentTask.data_cadastro)}
               </span>
+              {currentTask.data_inicio && (
+                <span className="flex items-center gap-1 text-blue-700 font-medium bg-blue-50 px-2 py-0.5 rounded">
+                  <Clock className="w-3.5 h-3.5 text-blue-600" />
+                  Início: {formatDate(currentTask.data_inicio)}
+                </span>
+              )}
+              {currentTask.data_previsao_fim && (
+                <span className="flex items-center gap-1 text-amber-700 font-medium bg-amber-50 px-2 py-0.5 rounded">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-amber-600" />
+                  Previsão: {formatDate(currentTask.data_previsao_fim)}
+                </span>
+              )}
             </div>
           </div>
 

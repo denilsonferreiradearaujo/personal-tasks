@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import {
   CheckSquare,
   LayoutGrid,
+  CalendarRange,
   Users,
   Settings,
   Crown,
@@ -63,6 +64,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'Quadro Kanban',
       href: '/',
       icon: LayoutGrid,
+      visible: true,
+    },
+    {
+      label: 'Gráfico de Gantt',
+      href: '/gantt',
+      icon: CalendarRange,
       visible: true,
     },
     {

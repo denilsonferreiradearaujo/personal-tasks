@@ -35,6 +35,10 @@ model Tarefa {
   isCompartilhada       Boolean              @default(false)
   shareToken            String?              @unique @db.VarChar(255)
   data_cadastro         DateTime             @default(now())
+  data_previsao_inicio  DateTime?
+  data_inicio           DateTime?
+  data_previsao_fim     DateTime?
+  data_conclusao        DateTime?
   usuario               User                 @relation("TarefasCriadas", fields: [id_usuario], references: [id_usuario], onDelete: Cascade)
   comentarios           TarefaComentario[]
   compartilhamentos     TarefaCompartilhada[]

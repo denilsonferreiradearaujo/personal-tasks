@@ -25,6 +25,7 @@ import { CreateTaskDto } from './dto/create-task.dto';
 import { ShareTaskDto } from './dto/share-task.dto';
 import { UpdateStatusDto } from './dto/update-status.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
+import { UpdateTimelineDto } from './dto/update-timeline.dto';
 import { TasksService } from './tasks.service';
 
 // Configuração do Multer Storage para upload de imagens e arquivos
@@ -117,6 +118,18 @@ export class TasksController {
     @Body() updateStatusDto: UpdateStatusDto,
   ) {
     return this.tasksService.updateStatus(id, updateStatusDto.status);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Patch('tasks/:id/timeline')
+  @ApiOperation({ summary: 'Atualizar datas de cronograma (início, previsão e conclusão) no Gantt' })
+  async updateTimeline(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() updateTimelineDto: UpdateTimelineDto,
+    @Request() req: any,
+  ) {
+    return this.tasksService.updateTimeline(id, updateTimelineDto, req.user);
   }
 
   @UseGuards(JwtAuthGuard)

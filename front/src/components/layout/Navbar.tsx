@@ -35,6 +35,8 @@ export const Navbar: React.FC<NavbarProps> = ({
     switch (pathname) {
       case '/':
         return 'Quadro de Tarefas (Kanban)';
+      case '/gantt':
+        return 'Gráfico de Gantt (Linha do Tempo)';
       case '/usuarios':
         return 'Gestão de Usuários';
       case '/configuracoes':
