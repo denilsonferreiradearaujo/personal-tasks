@@ -84,6 +84,22 @@ export class TasksController {
 
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
+  @Put('tasks/order/personal')
+  @ApiOperation({ summary: 'Atualizar sequência pessoal de tarefas do usuário' })
+  async updatePersonalOrder(@Body() body: { items: { id_tarefa: number; posicao: number }[] }, @Request() req: any) {
+    return this.tasksService.updatePersonalOrder(body.items || [], req.user.id_usuario);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Put('tasks/order/global')
+  @ApiOperation({ summary: 'Atualizar sequência global de tarefas da equipe' })
+  async updateGlobalOrder(@Body() body: { items: { id_tarefa: number; ordem: number }[] }, @Request() req: any) {
+    return this.tasksService.updateGlobalOrder(body.items || [], req.user);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @Put('tasks/:id')
   @ApiOperation({ summary: 'Atualizar dados de uma tarefa' })
   async update(

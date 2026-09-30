@@ -55,6 +55,8 @@ export interface Task {
   email?: string;
   totalComentarios?: number;
   totalCompartilhamentos?: number;
+  ordem?: number;
+  posicaoPessoal?: number | null;
   isOwner?: boolean;
   isSharedWithMe?: boolean;
   comentarios?: TaskComment[];

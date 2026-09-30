@@ -19,6 +19,7 @@ model User {
   tarefas               Tarefa[]             @relation("TarefasCriadas")
   comentarios           TarefaComentario[]
   compartilhamentos     TarefaCompartilhada[]
+  ordensTarefas         UsuarioOrdemTarefa[]
 
   @@map("usuario")
 }
@@ -30,15 +31,32 @@ model Tarefa {
   equipe                String               @db.VarChar(255)
   prioridade            String               @db.VarChar(50)
   status                String               @default("Não Iniciado") @db.VarChar(50)
+  ordem                 Int                  @default(0) // Posição/ordem global da tarefa
   isCompartilhada       Boolean              @default(false)
   shareToken            String?              @unique @db.VarChar(255)
   data_cadastro         DateTime             @default(now())
   usuario               User                 @relation("TarefasCriadas", fields: [id_usuario], references: [id_usuario], onDelete: Cascade)
   comentarios           TarefaComentario[]
   compartilhamentos     TarefaCompartilhada[]
+  ordensPessoais        UsuarioOrdemTarefa[]
 
   @@index([id_usuario], map: "tarefa_id_usuario_fkey")
   @@map("tarefa")
+}
+
+model UsuarioOrdemTarefa {
+  id_ordem     Int      @id @default(autoincrement())
+  id_usuario   Int
+  id_tarefa    Int
+  posicao      Int      @default(0)
+  
+  usuario      User     @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade)
+  tarefa       Tarefa   @relation(fields: [id_tarefa], references: [id_tarefa], onDelete: Cascade)
+
+  @@unique([id_usuario, id_tarefa])
+  @@index([id_usuario])
+  @@index([id_tarefa])
+  @@map("usuario_ordem_tarefa")
 }
 
 model TarefaCompartilhada {

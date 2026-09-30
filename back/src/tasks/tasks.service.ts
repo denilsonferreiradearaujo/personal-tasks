@@ -129,6 +129,12 @@ export class TasksService {
         _count: {
           select: { comentarios: true, compartilhamentos: true },
         },
+        ordensPessoais: currentUser
+          ? {
+              where: { id_usuario: currentUser.id_usuario },
+              select: { posicao: true },
+            }
+          : false,
       },
       orderBy: { data_cadastro: 'desc' },
     });
@@ -136,6 +142,10 @@ export class TasksService {
     return tasks.map((t) => {
       const isOwner = currentUser ? t.id_usuario === currentUser.id_usuario : false;
       const isSharedWithMe = currentUser ? t.id_usuario !== currentUser.id_usuario : false;
+      const posicaoPessoal =
+        t.ordensPessoais && t.ordensPessoais.length > 0
+          ? t.ordensPessoais[0].posicao
+          : null;
 
       return {
         id_tarefa: t.id_tarefa,
@@ -144,6 +154,8 @@ export class TasksService {
         equipe: t.equipe,
         prioridade: t.prioridade,
         status: t.status,
+        ordem: t.ordem ?? 0,
+        posicaoPessoal,
         isCompartilhada: t.isCompartilhada,
         shareToken: t.shareToken,
         data_cadastro: t.data_cadastro,
@@ -155,6 +167,46 @@ export class TasksService {
         isSharedWithMe,
       };
     });
+  }
+
+  async updatePersonalOrder(items: { id_tarefa: number; posicao: number }[], userId: number) {
+    if (!items || items.length === 0) return { success: true };
+
+    const operations = items.map((item) =>
+      this.prisma.usuarioOrdemTarefa.upsert({
+        where: {
+          id_usuario_id_tarefa: {
+            id_usuario: userId,
+            id_tarefa: item.id_tarefa,
+          },
+        },
+        update: {
+          posicao: item.posicao,
+        },
+        create: {
+          id_usuario: userId,
+          id_tarefa: item.id_tarefa,
+          posicao: item.posicao,
+        },
+      }),
+    );
+
+    await this.prisma.$transaction(operations);
+    return { success: true, count: items.length };
+  }
+
+  async updateGlobalOrder(items: { id_tarefa: number; ordem: number }[], currentUser: { id_usuario: number; role: string }) {
+    if (!items || items.length === 0) return { success: true };
+
+    const operations = items.map((item) =>
+      this.prisma.tarefa.update({
+        where: { id_tarefa: item.id_tarefa },
+        data: { ordem: item.ordem },
+      }),
+    );
+
+    await this.prisma.$transaction(operations);
+    return { success: true, count: items.length };
   }
 
   async findOne(id: number, currentUser?: { id_usuario: number; email: string; role: string }) {

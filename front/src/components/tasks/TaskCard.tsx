@@ -10,6 +10,7 @@ import {
   Globe,
   MessageSquare,
   ChevronRight,
+  GripVertical,
 } from 'lucide-react';
 import { Task, TaskStatus } from '../../types';
 import { Badge } from '../ui/Badge';
@@ -18,20 +19,32 @@ import { useAuth } from '../../context/AuthContext';
 
 interface TaskCardProps {
   task: Task;
+  index: number;
+  orderMode?: 'personal' | 'global';
   onEdit: (task: Task) => void;
   onDelete: (id: number) => void;
   onStatusChange: (id: number, newStatus: TaskStatus) => void;
   onViewDetails?: (task: Task) => void;
   isUnread?: boolean;
+  onDragStart?: (e: React.DragEvent, task: Task, index: number) => void;
+  onDragOver?: (e: React.DragEvent, index: number) => void;
+  onDragEnd?: (e: React.DragEvent) => void;
+  isDragging?: boolean;
 }
 
 export const TaskCard: React.FC<TaskCardProps> = ({
   task,
+  index,
+  orderMode = 'personal',
   onEdit,
   onDelete,
   onStatusChange,
   onViewDetails,
   isUnread = false,
+  onDragStart,
+  onDragOver,
+  onDragEnd,
+  isDragging = false,
 }) => {
   const { user } = useAuth();
 
@@ -61,15 +74,46 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   };
 
   return (
-    <div className={`group relative rounded-xl border p-4 shadow-sm hover:shadow-md transition-all duration-200 text-left flex flex-col justify-between ${
-      isSharedWithMe 
-        ? 'border-indigo-200/90 bg-gradient-to-b from-indigo-50/30 to-white hover:border-indigo-300' 
-        : 'border-slate-200/80 bg-white hover:border-blue-200'
-    }`}>
+    <div
+      draggable
+      onDragStart={(e) => onDragStart && onDragStart(e, task, index)}
+      onDragOver={(e) => onDragOver && onDragOver(e, index)}
+      onDragEnd={onDragEnd}
+      className={`group relative rounded-xl border p-4 shadow-sm hover:shadow-md transition-all duration-150 text-left flex flex-col justify-between cursor-grab active:cursor-grabbing ${
+        isDragging ? 'opacity-35 scale-[0.98] border-dashed border-blue-500 bg-blue-50/30' : ''
+      } ${
+        isSharedWithMe 
+          ? 'border-indigo-200/90 bg-gradient-to-b from-indigo-50/30 to-white hover:border-indigo-300' 
+          : 'border-slate-200/80 bg-white hover:border-blue-200'
+      }`}
+    >
       {/* Header: Priority, Privacy & Squad */}
       <div>
         <div className="flex items-center justify-between gap-1 mb-2.5">
           <div className="flex items-center gap-1.5 flex-wrap">
+            <div className="flex items-center gap-1">
+              <span
+                className="text-slate-300 group-hover:text-slate-500 cursor-grab active:cursor-grabbing transition-colors"
+                title="Arraste para reordenar a prioridade ou mudar de coluna"
+              >
+                <GripVertical className="h-3.5 w-3.5" />
+              </span>
+              <span
+                className={`text-[10px] font-black px-1.5 py-0.5 rounded ${
+                  orderMode === 'personal'
+                    ? 'bg-blue-50 text-blue-700 border border-blue-200/60'
+                    : 'bg-slate-100 text-slate-700 border border-slate-200/80'
+                }`}
+                title={
+                  orderMode === 'personal'
+                    ? `Posição #${index + 1} na sua fila de execução pessoal`
+                    : `Posição #${index + 1} na ordem geral da equipe`
+                }
+              >
+                #{index + 1}
+              </span>
+            </div>
+
             {getPriorityBadge(task.prioridade)}
             {isSharedWithMe ? (
               <span className="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200 shadow-xs" title={`Compartilhada com você por ${task.nome || 'outro usuário'}`}>
