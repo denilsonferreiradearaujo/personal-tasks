@@ -86,7 +86,7 @@ export const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, onSuccess
         <Input
           label="WhatsApp / Telefone com DDD (Opcional)"
           type="text"
-          placeholder="Ex: 5519999486552 ou 19999486552"
+          placeholder="Ex: 5511999999999 ou 11999999999"
           value={telefone}
           onChange={(e) => setTelefone(e.target.value)}
         />
@@ -94,7 +94,7 @@ export const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, onSuccess
         <Input
           label="Senha de Acesso (Opcional)"
           type="password"
-          placeholder="Padrão: 123456"
+          placeholder="Padrão: 12345678"
           value={senha}
           onChange={(e) => setSenha(e.target.value)}
         />

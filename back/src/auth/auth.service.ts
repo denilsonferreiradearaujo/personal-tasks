@@ -44,6 +44,7 @@ export class AuthService {
         nome: registerDto.nome,
         email: registerDto.email.toLowerCase().trim(),
         senha: senhaHash,
+        telefone: registerDto.telefone ? registerDto.telefone.replace(/\D/g, '') : null,
         role: isFirstUser ? 'ROOT' : 'USER',
         ativo: isFirstUser ? true : false, // Requer aprovação se não for root
       },
@@ -51,6 +52,7 @@ export class AuthService {
         id_usuario: true,
         nome: true,
         email: true,
+        telefone: true,
         role: true,
         ativo: true,
         data_criacao: true,

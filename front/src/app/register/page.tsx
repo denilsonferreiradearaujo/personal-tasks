@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { CheckSquare, Lock, Mail, User, ArrowRight, AlertCircle } from 'lucide-react';
+import { CheckSquare, Lock, Mail, User, Phone, ArrowRight, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
@@ -14,6 +14,7 @@ export default function RegisterPage() {
 
   const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');
+  const [telefone, setTelefone] = useState('');
   const [senha, setSenha] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -34,7 +35,7 @@ export default function RegisterPage() {
     setError(null);
 
     try {
-      await register(nome, email, senha);
+      await register(nome, email, senha, telefone.trim() || undefined);
       router.push('/');
     } catch (err: any) {
       console.error(err);
@@ -92,6 +93,16 @@ export default function RegisterPage() {
               icon={<Mail className="h-4 w-4" />}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+            />
+
+            <Input
+              label="WhatsApp / Telefone com DDD (Opcional)"
+              type="text"
+              id="register-telefone"
+              placeholder="Ex: (11) 99999-9999 ou 11999999999"
+              icon={<Phone className="h-4 w-4" />}
+              value={telefone}
+              onChange={(e) => setTelefone(e.target.value)}
             />
 
             <Input

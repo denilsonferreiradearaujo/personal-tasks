@@ -593,6 +593,7 @@ export const GanttChart: React.FC<GanttChartProps> = ({
                         <div
                           key={idx}
                           style={{ width: `${cellWidth}px` }}
+                          title={formatDate(day.toISOString())}
                           className={`flex flex-col items-center justify-center border-r border-slate-100 text-[10px] shrink-0 ${
                             isToday
                               ? 'bg-blue-50 text-blue-700 font-black'
@@ -601,7 +602,9 @@ export const GanttChart: React.FC<GanttChartProps> = ({
                               : 'text-slate-600'
                           }`}
                         >
-                          <span className="leading-tight">{dayNumber}</span>
+                          {viewMode !== 'months' && (
+                            <span className="leading-tight">{dayNumber}</span>
+                          )}
                           {viewMode === 'days' && (
                             <span className="text-[8px] font-semibold uppercase opacity-75">
                               {weekDayLetter}
@@ -620,12 +623,8 @@ export const GanttChart: React.FC<GanttChartProps> = ({
                       left: `${todayIndex * cellWidth + cellWidth / 2}px`,
                       height: '100%',
                     }}
-                    className="absolute top-16 w-0.5 bg-blue-500 z-10 pointer-events-none"
-                  >
-                    <div className="sticky top-16 -ml-3.5 bg-blue-600 text-white text-[9px] font-black uppercase px-1 py-0.5 rounded shadow-xs">
-                      Hoje
-                    </div>
-                  </div>
+                    className="absolute top-16 w-0.5 bg-blue-500/70 z-10 pointer-events-none"
+                  />
                 )}
 
                 {/* Linhas de Fundo e Barras do Gantt */}
@@ -666,7 +665,6 @@ export const GanttChart: React.FC<GanttChartProps> = ({
                             isDraggingThis ? 'ring-2 ring-blue-400 ring-offset-2 scale-102 z-30 shadow-md' : ''
                           }`}
                           onMouseDown={(e) => handleMouseDown(e, task, 'move')}
-                          onClick={() => handleOpenDetails(task)}
                           title={`${task.descricao}\n${pos.hasRealStart ? 'Início Real' : 'Previsão de Início'}: ${formatDate(pos.dStart.toISOString())}\n${pos.hasRealEnd ? 'Conclusão Real' : 'Previsão de Término'}: ${formatDate(pos.dEnd.toISOString())} (${pos.durationDays} dias)`}
                         >
                           {/* Alça Esquerda (Resize Start) */}
@@ -678,12 +676,9 @@ export const GanttChart: React.FC<GanttChartProps> = ({
                             <div className="w-1 h-3 bg-white/70 rounded-full" />
                           </div>
 
-                          {/* Conteúdo Central da Barra: Título Truncado com Tooltip */}
-                          <div className="flex-1 flex items-center gap-1.5 overflow-hidden px-1">
-                            <span
-                              className="text-xs font-semibold truncate block drop-shadow-xs"
-                              title={task.descricao}
-                            >
+                          {/* Conteúdo Central da Barra: Título Truncado com Tooltip Unificado */}
+                          <div className="flex-1 flex items-center gap-1.5 overflow-hidden px-1 pointer-events-none">
+                            <span className="text-xs font-semibold truncate block drop-shadow-xs">
                               {task.descricao}
                             </span>
                             <span className="text-[10px] opacity-80 shrink-0 hidden sm:inline">

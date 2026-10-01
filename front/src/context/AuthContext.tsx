@@ -114,7 +114,8 @@ interface AuthContextType {
   register: (
     nome: string,
     email: string,
-    senha: string
+    senha: string,
+    telefone?: string
   ) => Promise<void>;
 
   logout: () => void;
@@ -201,7 +202,8 @@ export const AuthProvider: React.FC<{
   const register = async (
     nome: string,
     email: string,
-    senha: string
+    senha: string,
+    telefone?: string
   ) => {
     const response = await api.post<AuthResponse>(
       '/auth/register',
@@ -209,6 +211,7 @@ export const AuthProvider: React.FC<{
         nome,
         email,
         senha,
+        telefone: telefone ? telefone.trim() : undefined,
       }
     );
 

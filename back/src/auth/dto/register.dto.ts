@@ -17,4 +17,9 @@ export class RegisterDto {
   @IsNotEmpty({ message: 'A senha é obrigatória.' })
   @MinLength(8, { message: 'A senha deve ter no mínimo 8 caracteres.' })
   senha: string;
+
+  @ApiProperty({ example: '5519999486552', description: 'Telefone / WhatsApp com DDD (Opcional)', required: false })
+  @IsString()
+  telefone?: string;
 }
+
