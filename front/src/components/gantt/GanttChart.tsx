@@ -42,7 +42,6 @@ export const GanttChart: React.FC<GanttChartProps> = ({
   onRefresh,
 }) => {
   const [viewMode, setViewMode] = useState<ViewMode>('days');
-  const [currentOffsetDays, setCurrentOffsetDays] = useState(0);
 
   // Modal de Detalhes
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -69,19 +68,19 @@ export const GanttChart: React.FC<GanttChartProps> = ({
       case 'weeks':
         return 22; // 22px por dia
       case 'months':
-        return 9;  // 9px por dia
+        return 10; // 10px por dia (~300px por mês)
       default:
         return 48;
     }
   }, [viewMode]);
 
-  // Cálculo da janela temporal geral
+  // Cálculo da janela temporal geral contínua com meses completos
   const { startDate, totalDays, daysArray } = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
     let minTime = today.getTime();
-    let maxTime = today.getTime() + 20 * 86400000;
+    let maxTime = today.getTime() + 30 * 86400000;
 
     tasks.forEach((t) => {
       const dStart = t.data_inicio
@@ -97,31 +96,30 @@ export const GanttChart: React.FC<GanttChartProps> = ({
       if (dEnd.getTime() > maxTime) maxTime = dEnd.getTime();
     });
 
-    // Margem de dias antes e depois para navegação confortável
-    const baseStart = new Date(minTime - 7 * 86400000);
-    baseStart.setHours(0, 0, 0, 0);
+    const minDate = new Date(Math.min(minTime, today.getTime()));
+    // Início sempre no dia 1 do mês, pelo menos 4 meses antes da menor data
+    const startRange = new Date(minDate.getFullYear(), minDate.getMonth() - 4, 1);
+    startRange.setHours(0, 0, 0, 0);
 
-    // Aplica o deslocamento da navegação
-    const adjustedStart = new Date(baseStart.getTime() + currentOffsetDays * 86400000);
+    const maxDate = new Date(Math.max(maxTime, today.getTime()));
+    // Fim sempre no último dia do mês, pelo menos 9 meses após a maior data
+    const endRange = new Date(maxDate.getFullYear(), maxDate.getMonth() + 9, 0);
+    endRange.setHours(23, 59, 59, 999);
 
-    // Número total de dias visíveis no buffer da timeline
-    const durationDaysCount = Math.max(
-      60,
-      Math.ceil((maxTime - minTime) / 86400000) + 30
-    );
+    const totalDaysCount = Math.round((endRange.getTime() - startRange.getTime()) / 86400000) + 1;
 
     const days: Date[] = [];
-    for (let i = 0; i < durationDaysCount; i++) {
-      const d = new Date(adjustedStart.getTime() + i * 86400000);
+    for (let i = 0; i < totalDaysCount; i++) {
+      const d = new Date(startRange.getTime() + i * 86400000);
       days.push(d);
     }
 
     return {
-      startDate: adjustedStart,
-      totalDays: durationDaysCount,
+      startDate: startRange,
+      totalDays: totalDaysCount,
       daysArray: days,
     };
-  }, [tasks, currentOffsetDays]);
+  }, [tasks]);
 
   // Identificação do índice do dia "Hoje"
   const todayIndex = useMemo(() => {
@@ -130,6 +128,18 @@ export const GanttChart: React.FC<GanttChartProps> = ({
     const diff = Math.round((today.getTime() - startDate.getTime()) / 86400000);
     return diff >= 0 && diff < totalDays ? diff : null;
   }, [startDate, totalDays]);
+
+  // Navegação horizontal suave via scroll da timeline
+  const handleNavigate = (direction: 'prev' | 'next') => {
+    if (timelineScrollRef.current) {
+      const step = viewMode === 'days' ? 500 : viewMode === 'weeks' ? 350 : 280;
+      const scrollAmount = direction === 'prev' ? -step : step;
+      timelineScrollRef.current.scrollBy({
+        left: scrollAmount,
+        behavior: 'smooth',
+      });
+    }
+  };
 
   // Centralizar visualização em "Hoje"
   const scrollToToday = () => {
@@ -434,9 +444,9 @@ export const GanttChart: React.FC<GanttChartProps> = ({
           {/* Navegação Temporal */}
           <div className="inline-flex items-center rounded-lg border border-slate-200 bg-white">
             <button
-              onClick={() => setCurrentOffsetDays((prev) => prev - 14)}
-              className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-50 rounded-l-lg transition-colors"
-              title="Voltar 14 dias"
+              onClick={() => handleNavigate('prev')}
+              className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-50 rounded-l-lg transition-colors cursor-pointer"
+              title="Rolar visualização para trás"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
@@ -444,9 +454,9 @@ export const GanttChart: React.FC<GanttChartProps> = ({
               Navegar
             </span>
             <button
-              onClick={() => setCurrentOffsetDays((prev) => prev + 14)}
-              className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-50 rounded-r-lg transition-colors"
-              title="Avançar 14 dias"
+              onClick={() => handleNavigate('next')}
+              className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-50 rounded-r-lg transition-colors cursor-pointer"
+              title="Rolar visualização para frente"
             >
               <ChevronRight className="w-4 h-4" />
             </button>
