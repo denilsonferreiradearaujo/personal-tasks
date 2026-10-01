@@ -14,6 +14,7 @@ import {
   Users,
   UserPlus,
   Trash2,
+  Pencil,
   Mail,
   Phone,
   Lock,
@@ -36,6 +37,7 @@ export default function UsuariosPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
+  const [selectedUserToEdit, setSelectedUserToEdit] = useState<User | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [actionLoadingId, setActionLoadingId] = useState<number | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -211,8 +213,11 @@ export default function UsuariosPage() {
                 </div>
 
                 <Button
-                  onClick={() => setIsUserModalOpen(true)}
-                  className="flex items-center gap-2 self-start md:self-auto"
+                  onClick={() => {
+                    setSelectedUserToEdit(null);
+                    setIsUserModalOpen(true);
+                  }}
+                  className="flex items-center gap-2 self-start md:self-auto cursor-pointer"
                 >
                   <UserPlus className="h-4 w-4" />
                   <span>Novo Usuário</span>
@@ -387,18 +392,32 @@ export default function UsuariosPage() {
 
                               {/* Ações */}
                               <td className="px-5 py-4 whitespace-nowrap text-right text-sm">
-                                <button
-                                  onClick={() => handleDeleteUser(u.id_usuario, u.nome)}
-                                  disabled={isTargetRoot || actionLoadingId === u.id_usuario}
-                                  title={isTargetRoot ? 'Usuário Root não pode ser excluído' : 'Remover Usuário'}
-                                  className={`p-1.5 rounded-lg transition-colors ${
-                                    isTargetRoot
-                                      ? 'text-slate-200 cursor-not-allowed'
-                                      : 'text-slate-400 hover:text-rose-600 hover:bg-rose-50'
-                                  }`}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </button>
+                                <div className="flex items-center justify-end space-x-1.5">
+                                  <button
+                                    onClick={() => {
+                                      setSelectedUserToEdit(u);
+                                      setIsUserModalOpen(true);
+                                    }}
+                                    disabled={actionLoadingId === u.id_usuario}
+                                    title="Editar Dados do Usuário"
+                                    className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
+                                  >
+                                    <Pencil className="h-4 w-4" />
+                                  </button>
+
+                                  <button
+                                    onClick={() => handleDeleteUser(u.id_usuario, u.nome)}
+                                    disabled={isTargetRoot || actionLoadingId === u.id_usuario}
+                                    title={isTargetRoot ? 'Usuário Root não pode ser excluído' : 'Remover Usuário'}
+                                    className={`p-1.5 rounded-lg transition-colors ${
+                                      isTargetRoot
+                                        ? 'text-slate-200 cursor-not-allowed'
+                                        : 'text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer'
+                                    }`}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           );
@@ -416,7 +435,11 @@ export default function UsuariosPage() {
       {isAuthenticated && (
         <UserModal
           isOpen={isUserModalOpen}
-          onClose={() => setIsUserModalOpen(false)}
+          userToEdit={selectedUserToEdit}
+          onClose={() => {
+            setIsUserModalOpen(false);
+            setSelectedUserToEdit(null);
+          }}
           onSuccess={fetchUsers}
         />
       )}

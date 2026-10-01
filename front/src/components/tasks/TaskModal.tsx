@@ -27,7 +27,6 @@ export const TaskModal: React.FC<TaskModalProps> = ({
   const { user: currentUser } = useAuth();
   const isAdmin = currentUser?.role === 'ADMIN' || currentUser?.role === 'ROOT';
 
-  const [users, setUsers] = useState<User[]>([]);
   const [descricao, setDescricao] = useState('');
   const [equipe, setEquipe] = useState('');
   const [idUsuario, setIdUsuario] = useState<number | string>(currentUser?.id_usuario || '');
@@ -46,26 +45,6 @@ export const TaskModal: React.FC<TaskModalProps> = ({
       return '';
     }
   };
-
-  // Carregar lista de usuários para seleção apenas para Admin/Root
-  useEffect(() => {
-    if (isOpen && isAdmin) {
-      api
-        .get('/usuarios')
-        .then((res) => {
-          const list = Array.isArray(res.data) ? res.data : res.data.users || [];
-          setUsers(list);
-          if (!taskToEdit && !idUsuario && currentUser) {
-            setIdUsuario(currentUser.id_usuario);
-          }
-        })
-        .catch((err) => {
-          console.error('Erro ao carregar usuários:', err);
-        });
-    } else if (isOpen && currentUser) {
-      setIdUsuario(currentUser.id_usuario);
-    }
-  }, [isOpen, isAdmin, currentUser]);
 
   // Preencher dados ao editar ou abrir novo
   useEffect(() => {
@@ -179,32 +158,6 @@ export const TaskModal: React.FC<TaskModalProps> = ({
           value={equipe}
           onChange={(e) => setEquipe(e.target.value)}
         />
-
-        {/* Usuário Responsável - Apenas exibido se for Admin ou Root */}
-        {isAdmin && (
-          <div className="text-left space-y-1.5">
-            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider">
-              Usuário Responsável (Atribuir)
-            </label>
-            <select
-              value={idUsuario}
-              onChange={(e) => setIdUsuario(e.target.value)}
-              className="block w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-            >
-              {users.length === 0 ? (
-                <option value={currentUser?.id_usuario || ''}>
-                  {currentUser?.nome} (Você)
-                </option>
-              ) : (
-                users.map((u) => (
-                  <option key={u.id_usuario} value={u.id_usuario}>
-                    {u.nome} ({u.email}) {u.id_usuario === currentUser?.id_usuario ? '- (Você)' : ''}
-                  </option>
-                ))
-              )}
-            </select>
-          </div>
-        )}
 
         {/* Prioridade e Status (Status apenas na edição) */}
         {taskToEdit ? (

@@ -7,6 +7,7 @@ import {
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
 
 @Injectable()
 export class UsersService {
@@ -133,6 +134,42 @@ export class UsersService {
     });
   }
 
+  async update(id: number, updateUserDto: UpdateUserDto) {
+    await this.findOne(id);
+
+    const dataToUpdate: any = {};
+
+    if (updateUserDto.nome !== undefined) {
+      if (!updateUserDto.nome.trim()) {
+        throw new BadRequestException('O nome não pode ser vazio.');
+      }
+      dataToUpdate.nome = updateUserDto.nome.trim();
+    }
+
+    if (updateUserDto.telefone !== undefined) {
+      dataToUpdate.telefone = updateUserDto.telefone ? updateUserDto.telefone.replace(/\D/g, '') : null;
+    }
+
+    if (updateUserDto.senha) {
+      const salt = await bcrypt.genSalt(10);
+      dataToUpdate.senha = await bcrypt.hash(updateUserDto.senha, salt);
+    }
+
+    return this.prisma.user.update({
+      where: { id_usuario: id },
+      data: dataToUpdate,
+      select: {
+        id_usuario: true,
+        nome: true,
+        email: true,
+        telefone: true,
+        role: true,
+        ativo: true,
+        data_criacao: true,
+      },
+    });
+  }
+
   async remove(id: number) {
     const user = await this.findOne(id);
     if (user.role === 'ROOT') {
@@ -144,3 +181,4 @@ export class UsersService {
     });
   }
 }
+

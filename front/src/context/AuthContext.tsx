@@ -120,6 +120,8 @@ interface AuthContextType {
 
   logout: () => void;
 
+  updateUser: (updatedUser: Partial<User>) => void;
+
   isAuthenticated: boolean;
 }
 
@@ -245,6 +247,22 @@ export const AuthProvider: React.FC<{
     localStorage.removeItem('user');
   };
 
+  /**
+   * Atualizar dados locais da sessão do usuário
+   */
+  const updateUser = (updatedUser: Partial<User>) => {
+    setUser((prev) => {
+      if (!prev) return null;
+      const merged = { ...prev, ...updatedUser };
+      try {
+        localStorage.setItem('user', JSON.stringify(merged));
+      } catch (err) {
+        console.error('Erro ao atualizar user no localStorage:', err);
+      }
+      return merged;
+    });
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -254,6 +272,7 @@ export const AuthProvider: React.FC<{
         login,
         register,
         logout,
+        updateUser,
         isAuthenticated: !!token,
       }}
     >

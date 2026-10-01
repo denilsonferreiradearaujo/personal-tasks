@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   Param,
   ParseIntPipe,
@@ -15,6 +16,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
 import { UsersService } from './users.service';
 
 @ApiTags('Usuários')
@@ -67,6 +69,26 @@ export class UsersController {
     @Request() req: any,
   ) {
     return this.usersService.updateRole(id, role, req.user.id_usuario);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('usuarios/:id')
+  @ApiOperation({ summary: 'Atualizar dados cadastrais do usuário (próprio usuário ou Admin/Root)' })
+  @ApiResponse({ status: 200, description: 'Usuário atualizado com sucesso.' })
+  async update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() updateUserDto: UpdateUserDto,
+    @Request() req: any,
+  ) {
+    const requester = req.user;
+    const isOwner = requester.id_usuario === id;
+    const isAdminOrRoot = requester.role === 'ADMIN' || requester.role === 'ROOT';
+
+    if (!isOwner && !isAdminOrRoot) {
+      throw new ForbiddenException('Você não tem permissão para editar os dados deste usuário.');
+    }
+
+    return this.usersService.update(id, updateUserDto);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

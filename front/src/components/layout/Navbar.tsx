@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -15,6 +15,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useSettings } from '../../context/SettingsContext';
 import { Button } from '../ui/Button';
 import { getInitials } from '../../lib/utils';
+import { ProfileModal } from '../users/ProfileModal';
 
 interface NavbarProps {
   onOpenNewTask?: () => void;
@@ -28,6 +29,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const pathname = usePathname();
   const { user, isAuthenticated, logout, loading } = useAuth();
   const { settings } = useSettings();
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
   const isRoot = user?.role === 'ROOT';
 
@@ -111,10 +113,15 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </Button>
               )}
 
-              {/* PERFIL DO USUÁRIO NO HEADER */}
+              {/* PERFIL DO USUÁRIO NO HEADER (CLICÁVEL PARA EDIÇÃO) */}
               <div className="flex items-center pl-2 sm:pl-3 border-l border-slate-200 space-x-2.5">
-                <div className="flex items-center space-x-2">
-                  <div className="h-8 w-8 rounded-full bg-slate-900 text-white font-bold text-xs flex items-center justify-center shadow-xs relative">
+                <button
+                  type="button"
+                  onClick={() => setIsProfileModalOpen(true)}
+                  title="Clique para editar seu perfil"
+                  className="flex items-center space-x-2 p-1 -m-1 rounded-lg hover:bg-slate-100/80 transition-all cursor-pointer text-left group"
+                >
+                  <div className="h-8 w-8 rounded-full bg-slate-900 text-white font-bold text-xs flex items-center justify-center shadow-xs relative group-hover:ring-2 group-hover:ring-blue-500/40 transition-all">
                     {getInitials(user.nome)}
                     {isRoot && (
                       <span
@@ -127,7 +134,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   </div>
                   <div className="hidden xl:block text-left">
                     <div className="flex items-center gap-1">
-                      <span className="text-xs font-bold text-slate-800 leading-tight">
+                      <span className="text-xs font-bold text-slate-800 leading-tight group-hover:text-blue-600 transition-colors">
                         {user.nome}
                       </span>
                       {user.role === 'ROOT' ? (
@@ -144,16 +151,22 @@ export const Navbar: React.FC<NavbarProps> = ({
                       {user.email}
                     </span>
                   </div>
-                </div>
+                </button>
 
                 <button
                   onClick={logout}
                   title="Sair do sistema"
-                  className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                  className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                 >
                   <LogOut className="h-4 w-4" />
                 </button>
               </div>
+
+              {/* MODAL DE EDIÇÃO DO PRÓPRIO PERFIL */}
+              <ProfileModal
+                isOpen={isProfileModalOpen}
+                onClose={() => setIsProfileModalOpen(false)}
+              />
             </>
           ) : (
             <Link href="/login">
