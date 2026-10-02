@@ -229,7 +229,8 @@ export class AuthService {
 
         for (const phoneAttempt of phonesToTry) {
           try {
-            console.log(`[WhatsApp] Tentando envio de OTP para ${phoneAttempt}...`);
+            const masked = phoneAttempt.length > 7 ? `${phoneAttempt.slice(0, 4)}****${phoneAttempt.slice(-4)}` : '***';
+            console.log(`[WhatsApp] Tentando envio de OTP para ${masked}...`);
             const response = await fetch(targetUrl, {
               method: 'POST',
               headers,
@@ -241,16 +242,16 @@ export class AuthService {
 
             const resText = await response.text();
             if (response.ok) {
-              console.log(`[WhatsApp] ✅ Código OTP enviado com sucesso para ${phoneAttempt}!`);
+              console.log(`[WhatsApp] ✅ Código OTP enviado com sucesso!`);
               sendSuccess = true;
               successfulPhone = phoneAttempt;
               break;
             } else {
-              console.warn(`[WhatsApp] ⚠️ Falha no envio para ${phoneAttempt} (HTTP ${response.status}):`, resText);
+              console.warn(`[WhatsApp] ⚠️ Falha no envio para ${masked} (HTTP ${response.status})`);
               lastErrorText = resText;
             }
           } catch (waErr: any) {
-            console.error(`[WhatsApp] ❌ Erro de conexão ao enviar para ${phoneAttempt}:`, waErr.message);
+            console.error(`[WhatsApp] ❌ Erro de conexão ao enviar mensagem:`, waErr.message);
             lastErrorText = waErr.message;
           }
         }
@@ -258,7 +259,7 @@ export class AuthService {
         if (!sendSuccess) {
           if (lastErrorText.includes('exists') && lastErrorText.includes('false')) {
             throw new BadRequestException(
-              `O WhatsApp informou que o número (${finalPhone}) não possui uma conta ativa no WhatsApp. Verifique se os dígitos e o DDD estão corretos.`,
+              `O WhatsApp informou que o número informado não possui uma conta ativa no WhatsApp. Verifique se os dígitos e o DDD estão corretos.`,
             );
           }
           throw new BadRequestException(
@@ -301,7 +302,7 @@ export class AuthService {
           });
         }
 
-        console.log(`[ForgotPassword] OTP gerado: "${code}" para "${successfulPhone}", expira em 120s`);
+        console.log(`[ForgotPassword] OTP gerado com sucesso e enviado por WhatsApp.`);
 
         return {
           success: true,

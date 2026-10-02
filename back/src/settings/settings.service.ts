@@ -156,7 +156,8 @@ export class SettingsService {
     let lastErrorText = '';
 
     for (const phoneAttempt of candidateNumbers) {
-      this.logger.log(`[WhatsApp Test] Enviando para: ${targetUrl} | Número: ${phoneAttempt}`);
+      const masked = phoneAttempt.length > 7 ? `${phoneAttempt.slice(0, 4)}****${phoneAttempt.slice(-4)}` : '***';
+      this.logger.log(`[WhatsApp Test] Enviando para: ${targetUrl} | Número: ${masked}`);
 
       try {
         const payload = {
@@ -171,7 +172,7 @@ export class SettingsService {
         });
 
         const responseText = await response.text();
-        this.logger.log(`[WhatsApp Test] Resposta HTTP ${response.status}: ${responseText}`);
+        this.logger.log(`[WhatsApp Test] Resposta HTTP ${response.status}`);
 
         if (response.ok) {
           sendSuccess = true;
@@ -182,7 +183,7 @@ export class SettingsService {
           lastErrorText = responseText;
         }
       } catch (err: any) {
-        this.logger.error(`[WhatsApp Test] Erro com ${phoneAttempt}: ${err.message}`);
+        this.logger.error(`[WhatsApp Test] Erro com ${masked}: ${err.message}`);
         lastErrorText = err.message;
       }
     }
