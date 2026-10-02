@@ -187,16 +187,102 @@ export class AuthService {
         const code = Math.floor(10000 + Math.random() * 90000).toString();
         const expiresAt = new Date(Date.now() + 120 * 1000);
 
+        const textMessage = `Olá, *${user.nome}*!\n\nSeu código de verificação para redefinir a senha no *${appTitle}* é:\n\n*${code}*\n\nEste código expira em *120 segundos*.`;
+
+        const whatsappUrl = settings?.whatsappUrl || process.env.WHATSAPP_URL;
+        const whatsappToken = settings?.whatsappToken || process.env.WHATSAPP_TOKEN;
+
+        if (!whatsappUrl) {
+          throw new BadRequestException('A URL da Evolution API de WhatsApp não está configurada no sistema.');
+        }
+
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+        };
+        if (whatsappToken) {
+          headers['apikey'] = whatsappToken;
+        }
+
+        let targetUrl = whatsappUrl.trim();
+        if (!targetUrl.includes('/message/sendText')) {
+          const cleanBase = targetUrl.replace(/\/+$/, '');
+          const instance = (settings?.whatsappInstance || 'personal-tasks').trim();
+          targetUrl = `${cleanBase}/message/sendText/${instance}`;
+        }
+
+        // Monta lista de números para tentar (com fallback inteligente do 9º dígito brasileiro)
+        const phonesToTry = [finalPhone];
+        if (finalPhone.startsWith('55')) {
+          // Se tem 13 dígitos e começa com 9 no 5º caractere, tenta sem o 9 (12 dígitos)
+          if (finalPhone.length === 13 && finalPhone[4] === '9') {
+            phonesToTry.push(finalPhone.slice(0, 4) + finalPhone.slice(5));
+          }
+          // Se tem 12 dígitos, tenta com o 9 (13 dígitos)
+          else if (finalPhone.length === 12) {
+            phonesToTry.push(finalPhone.slice(0, 4) + '9' + finalPhone.slice(4));
+          }
+        }
+
+        let sendSuccess = false;
+        let lastErrorText = '';
+        let successfulPhone = finalPhone;
+
+        for (const phoneAttempt of phonesToTry) {
+          try {
+            console.log(`[WhatsApp] Tentando envio de OTP para ${phoneAttempt}...`);
+            const response = await fetch(targetUrl, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify({
+                number: phoneAttempt,
+                text: textMessage,
+              }),
+            });
+
+            const resText = await response.text();
+            if (response.ok) {
+              console.log(`[WhatsApp] ✅ Código OTP enviado com sucesso para ${phoneAttempt}!`);
+              sendSuccess = true;
+              successfulPhone = phoneAttempt;
+              break;
+            } else {
+              console.warn(`[WhatsApp] ⚠️ Falha no envio para ${phoneAttempt} (HTTP ${response.status}):`, resText);
+              lastErrorText = resText;
+            }
+          } catch (waErr: any) {
+            console.error(`[WhatsApp] ❌ Erro de conexão ao enviar para ${phoneAttempt}:`, waErr.message);
+            lastErrorText = waErr.message;
+          }
+        }
+
+        if (!sendSuccess) {
+          if (lastErrorText.includes('exists') && lastErrorText.includes('false')) {
+            throw new BadRequestException(
+              `O WhatsApp informou que o número (${finalPhone}) não possui uma conta ativa no WhatsApp. Verifique se os dígitos e o DDD estão corretos.`,
+            );
+          }
+          throw new BadRequestException(
+            `Falha ao disparar mensagem pela Evolution API. Verifique as configurações e a conexão da instância.`,
+          );
+        }
+
         // Invalida OTPs anteriores
+        const allIdentifiers = [
+          finalPhone,
+          finalPhone.substring(2),
+          successfulPhone,
+          successfulPhone.substring(2),
+        ];
+
         await this.prisma.otpToken.updateMany({
           where: {
-            identifier: { in: [finalPhone, finalPhone.substring(2)] },
+            identifier: { in: allIdentifiers },
             used: false,
           },
           data: { used: true },
         });
 
-        // Cria o novo OTP
+        // Cria o novo OTP para ambos os identificadores para permitir validar de qualquer forma
         await this.prisma.otpToken.create({
           data: {
             identifier: finalPhone,
@@ -205,48 +291,17 @@ export class AuthService {
           },
         });
 
-        console.log(`[ForgotPassword] OTP gerado: "${code}" para "${finalPhone}", expira em 120s`);
-
-        const textMessage = `Olá, *${user.nome}*!\n\nSeu código de verificação para redefinir a senha no *${appTitle}* é:\n\n*${code}*\n\nEste código expira em *120 segundos*.`;
-
-        const whatsappUrl = settings?.whatsappUrl || process.env.WHATSAPP_URL;
-        const whatsappToken = settings?.whatsappToken || process.env.WHATSAPP_TOKEN;
-
-        if (whatsappUrl) {
-          try {
-            const headers: Record<string, string> = {
-              'Content-Type': 'application/json',
-            };
-            if (whatsappToken) {
-              headers['apikey'] = whatsappToken;
-            }
-
-            let targetUrl = whatsappUrl.trim();
-            if (!targetUrl.includes('/message/sendText')) {
-              const cleanBase = targetUrl.replace(/\/+$/, '');
-              const instance = (settings?.whatsappInstance || 'personal-tasks').trim();
-              targetUrl = `${cleanBase}/message/sendText/${instance}`;
-            }
-
-            const response = await fetch(targetUrl, {
-              method: 'POST',
-              headers,
-              body: JSON.stringify({
-                number: finalPhone,
-                text: textMessage,
-              }),
-            });
-
-            const resText = await response.text();
-            if (response.ok) {
-              console.log(`[WhatsApp] ✅ Código OTP enviado com sucesso para ${finalPhone}!`);
-            } else {
-              console.error(`[WhatsApp] ❌ Falha no envio da Evolution API (HTTP ${response.status}):`, resText);
-            }
-          } catch (waErr: any) {
-            console.error('[WhatsApp] ❌ Erro ao conectar à Evolution API:', waErr.message);
-          }
+        if (successfulPhone !== finalPhone) {
+          await this.prisma.otpToken.create({
+            data: {
+              identifier: successfulPhone,
+              code,
+              expiresAt,
+            },
+          });
         }
+
+        console.log(`[ForgotPassword] OTP gerado: "${code}" para "${successfulPhone}", expira em 120s`);
 
         return {
           success: true,
@@ -356,6 +411,13 @@ export class AuthService {
 
     const now = new Date();
     const phoneVariants = [cleanPhone, cleanPhone.substring(2)];
+    if (cleanPhone.startsWith('55') && cleanPhone.length === 13 && cleanPhone[4] === '9') {
+      const no9 = cleanPhone.slice(0, 4) + cleanPhone.slice(5);
+      phoneVariants.push(no9, no9.substring(2));
+    } else if (cleanPhone.startsWith('55') && cleanPhone.length === 12) {
+      const with9 = cleanPhone.slice(0, 4) + '9' + cleanPhone.slice(4);
+      phoneVariants.push(with9, with9.substring(2));
+    }
 
     const otp = await this.prisma.otpToken.findFirst({
       where: {
@@ -375,8 +437,8 @@ export class AuthService {
       where: { telefone: { in: phoneVariants } },
     });
 
-    if (!user && cleanPhone.length >= 9) {
-      const suffix = cleanPhone.slice(-9);
+    if (!user && cleanPhone.length >= 8) {
+      const suffix = cleanPhone.slice(-8);
       user = await this.prisma.user.findFirst({
         where: { telefone: { endsWith: suffix } },
       });

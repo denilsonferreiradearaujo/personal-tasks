@@ -136,11 +136,6 @@ export class SettingsService {
       headers['apikey'] = s.whatsappToken;
     }
 
-    const payload = {
-      number: cleanPhone,
-      text: textToSend,
-    };
-
     let targetUrl = s.whatsappUrl.trim();
     if (!targetUrl.includes('/message/sendText')) {
       const cleanBase = targetUrl.replace(/\/+$/, '');
@@ -148,33 +143,66 @@ export class SettingsService {
       targetUrl = `${cleanBase}/message/sendText/${instance}`;
     }
 
-    this.logger.log(`[WhatsApp Test] Enviando para: ${targetUrl} | Número: ${cleanPhone}`);
+    // Fallback inteligente para número de celular no Brasil (com e sem o 9º dígito)
+    const candidateNumbers: string[] = [cleanPhone];
+    if (cleanPhone.startsWith('55') && cleanPhone.length === 13 && cleanPhone[4] === '9') {
+      candidateNumbers.push(cleanPhone.slice(0, 4) + cleanPhone.slice(5));
+    } else if (cleanPhone.startsWith('55') && cleanPhone.length === 12) {
+      candidateNumbers.push(cleanPhone.slice(0, 4) + '9' + cleanPhone.slice(4));
+    }
 
-    try {
-      const response = await fetch(targetUrl, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(payload),
-      });
+    let sendSuccess = false;
+    let successfulPhone = cleanPhone;
+    let lastErrorText = '';
 
-      const responseText = await response.text();
-      this.logger.log(`[WhatsApp Test] Resposta HTTP ${response.status}: ${responseText}`);
+    for (const phoneAttempt of candidateNumbers) {
+      this.logger.log(`[WhatsApp Test] Enviando para: ${targetUrl} | Número: ${phoneAttempt}`);
 
-      if (!response.ok) {
+      try {
+        const payload = {
+          number: phoneAttempt,
+          text: textToSend,
+        };
+
+        const response = await fetch(targetUrl, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(payload),
+        });
+
+        const responseText = await response.text();
+        this.logger.log(`[WhatsApp Test] Resposta HTTP ${response.status}: ${responseText}`);
+
+        if (response.ok) {
+          sendSuccess = true;
+          successfulPhone = phoneAttempt;
+          lastErrorText = responseText;
+          break;
+        } else {
+          lastErrorText = responseText;
+        }
+      } catch (err: any) {
+        this.logger.error(`[WhatsApp Test] Erro com ${phoneAttempt}: ${err.message}`);
+        lastErrorText = err.message;
+      }
+    }
+
+    if (!sendSuccess) {
+      if (lastErrorText.includes('exists') && lastErrorText.includes('false')) {
         throw new BadRequestException(
-          `Falha no envio pela Evolution API (HTTP ${response.status}): ${responseText}`,
+          `O WhatsApp informou que o número (${cleanPhone}) não possui uma conta ativa no WhatsApp (exists: false). Verifique os dígitos e o DDD.`,
         );
       }
-
-      return {
-        success: true,
-        message: 'Mensagem de teste enviada com sucesso para o WhatsApp!',
-        response: responseText,
-      };
-    } catch (err: any) {
-      this.logger.error(`[WhatsApp Test] Erro: ${err.message}`);
-      throw new BadRequestException(`Erro ao conectar com a Evolution API: ${err.message}`);
+      throw new BadRequestException(
+        `Falha no envio pela Evolution API: ${lastErrorText}`,
+      );
     }
+
+    return {
+      success: true,
+      message: `Mensagem de teste enviada com sucesso para o WhatsApp (${successfulPhone})!`,
+      response: lastErrorText,
+    };
   }
 
   /**
