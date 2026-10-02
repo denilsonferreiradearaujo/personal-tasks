@@ -54,6 +54,13 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 
   // Estados de novo comentário e upload inline
   const [newCommentText, setNewCommentText] = useState('');
+  interface CommentAttachment {
+    id: string;
+    url: string;
+    nome: string;
+    tipo: 'IMAGE' | 'FILE';
+  }
+  const [newCommentAttachments, setNewCommentAttachments] = useState<CommentAttachment[]>([]);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploadingMedia, setIsUploadingMedia] = useState(false);
@@ -298,24 +305,20 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     });
   };
 
-  // Handler que faz upload e insere na sequência usando a posição gravada
-  const handleUploadAndInsert = async (
-    file: File,
-    cursorPos?: { start: number; end: number }
-  ) => {
+  // Handler que faz upload e armazena anexo visualmente sem poluir o texto com tags de código
+  const handleUploadAndInsert = async (file: File) => {
     const uploaded = await uploadMediaFile(file);
     if (!uploaded) return;
 
-    const tag = uploaded.tipo === 'IMAGE'
-      ? `![${uploaded.nome}](${uploaded.url})`
-      : `[arquivo:${uploaded.nome}](${uploaded.url})`;
-
-    insertMediaAtCursor(
-      newCommentTextareaRef.current,
-      setNewCommentText,
-      tag,
-      cursorPos || lastNewCommentCursorRef.current
-    );
+    setNewCommentAttachments((prev) => [
+      ...prev,
+      {
+        id: `att-${Date.now()}-${Math.random()}`,
+        url: uploaded.url,
+        nome: uploaded.nome,
+        tipo: uploaded.tipo,
+      },
+    ]);
   };
 
   // Marcar comentários como lidos no localStorage e notificar parent
@@ -362,12 +365,8 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     }
   };
 
-  // Capturar e anexar imagem direto da área de transferência com cursor síncrono
   // Capturar e anexar imagem direto da área de transferência com cursor síncrono para novo comentário
-  const handlePaste = async (
-    e: React.ClipboardEvent | ClipboardEvent,
-    forcedCursorPos?: { start: number; end: number }
-  ) => {
+  const handlePaste = async (e: React.ClipboardEvent | ClipboardEvent) => {
     const clipboardData = (e as any).clipboardData;
     if (!clipboardData) return;
 
@@ -380,17 +379,12 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
           if (file) {
             e.preventDefault();
 
-            const cursorPos = forcedCursorPos || {
-              start: newCommentTextareaRef.current?.selectionStart ?? lastNewCommentCursorRef.current.start,
-              end: newCommentTextareaRef.current?.selectionEnd ?? lastNewCommentCursorRef.current.end,
-            };
-
             const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
             const ext = file.type.includes('png') ? 'png' : file.type.includes('jpeg') ? 'jpg' : 'png';
             const renamedFile = new File([file], `printscreen-${timestamp}.${ext}`, {
               type: file.type || 'image/png',
             });
-            await handleUploadAndInsert(renamedFile, cursorPos);
+            await handleUploadAndInsert(renamedFile);
             break;
           }
         }
@@ -439,8 +433,8 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
               ]);
             }
           } else {
-            // No campo de novo comentário
-            await handleUploadAndInsert(renamedFile, lastNewCommentCursorRef.current);
+            // No campo de novo comentário, armazena anexo visual limpo
+            await handleUploadAndInsert(renamedFile);
           }
           break;
         }
@@ -527,6 +521,20 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [editingCommentId, lightboxImage]);
+
+  // Garante que todos os campos de texto se ajustem para mostrar o texto inteiro sem rolagem
+  useEffect(() => {
+    if (editingCommentId !== null) {
+      setTimeout(() => {
+        Object.values(textareasRef.current).forEach((el) => {
+          if (el) {
+            el.style.height = 'auto';
+            el.style.height = `${el.scrollHeight}px`;
+          }
+        });
+      }, 50);
+    }
+  }, [editingCommentId, editingBlocks]);
 
   // Atualizar o texto de um bloco específico
   const handleUpdateTextBlock = (index: number, newText: string) => {
@@ -643,17 +651,29 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   const handleSendComment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentTask) return;
-    if (!newCommentText.trim() && !selectedFile) return;
+    if (!newCommentText.trim() && newCommentAttachments.length === 0 && !selectedFile) return;
 
     try {
       setIsSubmitting(true);
-      const text = newCommentText.trim();
-      const hasImages = text.includes('![');
-      const hasFiles = text.includes('[arquivo:');
+      const textParts: string[] = [];
+      if (newCommentText.trim()) {
+        textParts.push(newCommentText.trim());
+      }
+      newCommentAttachments.forEach((att) => {
+        if (att.tipo === 'IMAGE') {
+          textParts.push(`![${att.nome}](${att.url})`);
+        } else {
+          textParts.push(`[arquivo:${att.nome}](${att.url})`);
+        }
+      });
+      const fullContent = textParts.join('\n\n');
+
+      const hasImages = fullContent.includes('![');
+      const hasFiles = fullContent.includes('[arquivo:');
       const tipo = hasImages ? 'IMAGE' : hasFiles ? 'FILE' : 'TEXT';
 
       const formData = new FormData();
-      formData.append('conteudo', text);
+      formData.append('conteudo', fullContent);
       formData.append('tipo', tipo);
 
       await api.post(`/tasks/${currentTask.id_tarefa}/comments`, formData, {
@@ -661,6 +681,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
       });
 
       setNewCommentText('');
+      setNewCommentAttachments([]);
       setSelectedFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
 
@@ -1160,7 +1181,11 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                   // MENSAGEM DO USUÁRIO LOGADO -> ALINHADA À DIREITA
                   return (
                     <div key={comment.id_comentario} className="flex justify-end w-full">
-                      <div className="max-w-[85%] sm:max-w-[75%] rounded-2xl rounded-tr-xs p-3.5 bg-blue-600 text-white shadow-sm border border-blue-700 text-left">
+                      <div
+                        className={`${
+                          isEditing ? 'w-full' : ''
+                        } max-w-[85%] sm:max-w-[75%] rounded-2xl rounded-tr-xs p-3.5 bg-blue-600 text-white shadow-sm border border-blue-700 text-left transition-all`}
+                      >
                         {/* Header do balão */}
                         <div className="flex items-center justify-between gap-3 mb-1.5 pb-1 border-b border-blue-500/50">
                           <div className="flex items-center gap-1.5 text-xs text-blue-100">
@@ -1193,7 +1218,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                         {isEditing ? (
                           <div
                             ref={editContainerRef}
-                            className="mt-2 bg-white rounded-2xl p-3.5 border border-blue-200 text-slate-800 shadow-sm space-y-2"
+                            className="mt-2 bg-white rounded-2xl p-3.5 border border-blue-200 text-slate-800 shadow-sm space-y-2 w-full"
                           >
                             <div className="flex items-center justify-between text-xs text-slate-400 pb-1.5 border-b border-slate-100">
                               <span className="font-semibold text-slate-600">Editar mensagem</span>
@@ -1209,6 +1234,10 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                                       key={block.id}
                                       ref={(el) => {
                                         textareasRef.current[idx] = el;
+                                        if (el) {
+                                          el.style.height = 'auto';
+                                          el.style.height = `${el.scrollHeight}px`;
+                                        }
                                       }}
                                       value={block.text || ''}
                                       onChange={(e) => {
@@ -1274,7 +1303,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                                       }}
                                       placeholder={editingBlocks.length <= 2 && !block.text ? "Digite sua mensagem... (Cole prints com Ctrl+V)" : ""}
                                       rows={Math.max(1, (block.text || '').split('\n').length)}
-                                      className="w-full text-sm text-slate-800 bg-transparent border-none outline-none focus:outline-none focus:ring-0 p-1 resize-none leading-relaxed block placeholder:text-slate-300"
+                                      className="w-full text-sm text-slate-800 bg-transparent border-none outline-none focus:outline-none focus:ring-0 p-1 resize-none overflow-hidden leading-relaxed block placeholder:text-slate-300"
                                     />
                                   );
                                 }
@@ -1479,44 +1508,29 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
             RODAPÉ DO MODAL - FORMULÁRIO DE POSTAGEM
         ====================================================== */}
         <div className="p-4 border-t border-slate-100 bg-slate-50/50">
-          {/* Miniaturas de mídias presentes no novo comentário */}
-          {extractMediasFromText(newCommentText).length > 0 && (
+          {/* Miniaturas de mídias anexadas ao novo comentário */}
+          {newCommentAttachments.length > 0 && (
             <div className="mb-2 p-2 bg-blue-50/70 border border-blue-200 rounded-xl flex flex-wrap gap-2 animate-in fade-in duration-150">
-              {extractMediasFromText(newCommentText).map((m, idx) => {
-                const mediaUrl = m.url.startsWith('http') ? m.url : `${backendBaseUrl}${m.url}`;
+              {newCommentAttachments.map((att) => {
+                const mediaUrl = att.url.startsWith('http') ? att.url : `${backendBaseUrl}${att.url}`;
                 return (
                   <div
-                    key={idx}
+                    key={att.id}
                     className="flex items-center gap-2 p-1.5 bg-white border border-blue-200 rounded-lg shadow-2xs text-xs text-slate-800"
                   >
-                    {m.isImage ? (
-                      <img src={mediaUrl} alt={m.nome} className="h-8 w-8 object-cover rounded shrink-0 border border-slate-200" />
+                    {att.tipo === 'IMAGE' ? (
+                      <img src={mediaUrl} alt={att.nome} className="h-8 w-8 object-cover rounded shrink-0 border border-slate-200" />
                     ) : (
                       <FileText className="w-4 h-4 text-blue-600 shrink-0" />
                     )}
                     <div className="text-left">
-                      <span className="block max-w-[130px] truncate font-bold text-slate-800 text-[11px]">{m.nome}</span>
+                      <span className="block max-w-[130px] truncate font-bold text-slate-800 text-[11px]">{att.nome}</span>
                       <span className="text-[10px] text-emerald-600 font-semibold">Anexo pronto</span>
                     </div>
                     <button
                       type="button"
                       onClick={() => {
-                        const rawIndex = newCommentText.indexOf(m.raw);
-                        const cleaned = newCommentText
-                          .replace(m.raw, '')
-                          .replace(/\n\s*\n\s*\n/g, '\n\n')
-                          .trim();
-                        setNewCommentText(cleaned);
-                        if (rawIndex >= 0) {
-                          const targetPos = Math.min(rawIndex, cleaned.length);
-                          lastNewCommentCursorRef.current = { start: targetPos, end: targetPos };
-                          setTimeout(() => {
-                            if (newCommentTextareaRef.current) {
-                              newCommentTextareaRef.current.focus();
-                              newCommentTextareaRef.current.setSelectionRange(targetPos, targetPos);
-                            }
-                          }, 50);
-                        }
+                        setNewCommentAttachments((prev) => prev.filter((a) => a.id !== att.id));
                       }}
                       className="text-slate-400 hover:text-rose-600 p-1 rounded hover:bg-slate-50 transition"
                       title="Remover anexo"
@@ -1542,7 +1556,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
               ref={fileInputRef}
               onChange={(e) => {
                 if (e.target.files && e.target.files[0]) {
-                  handleUploadAndInsert(e.target.files[0], lastNewCommentCursorRef.current);
+                  handleUploadAndInsert(e.target.files[0]);
                   e.target.value = '';
                 }
               }}
@@ -1554,7 +1568,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
               type="button"
               disabled={isUploadingMedia}
               onClick={() => fileInputRef.current?.click()}
-              title="Anexar arquivo ou colar printscreen (Ctrl+V) onde o cursor estiver"
+              title="Anexar arquivo ou colar printscreen (Ctrl+V)"
               className="p-3 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-xl border border-slate-200 bg-white transition shrink-0"
             >
               {isUploadingMedia ? (
@@ -1568,38 +1582,9 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
               <textarea
                 ref={newCommentTextareaRef}
                 value={newCommentText}
-                onChange={(e) => {
-                  setNewCommentText(e.target.value);
-                  lastNewCommentCursorRef.current = {
-                    start: e.target.selectionStart,
-                    end: e.target.selectionEnd,
-                  };
-                }}
-                onSelect={(e: any) => {
-                  lastNewCommentCursorRef.current = {
-                    start: e.target.selectionStart,
-                    end: e.target.selectionEnd,
-                  };
-                }}
-                onClick={(e: any) => {
-                  lastNewCommentCursorRef.current = {
-                    start: e.target.selectionStart,
-                    end: e.target.selectionEnd,
-                  };
-                }}
-                onKeyUp={(e: any) => {
-                  lastNewCommentCursorRef.current = {
-                    start: e.target.selectionStart,
-                    end: e.target.selectionEnd,
-                  };
-                }}
-                onPaste={(e) => {
-                  const target = e.currentTarget;
-                  const pos = { start: target.selectionStart, end: target.selectionEnd };
-                  lastNewCommentCursorRef.current = pos;
-                  handlePaste(e, pos);
-                }}
-                placeholder="Escreva parágrafos, cole prints (Ctrl+V) ou anexe arquivos na sequência desejada..."
+                onChange={(e) => setNewCommentText(e.target.value)}
+                onPaste={(e) => handlePaste(e)}
+                placeholder="Escreva uma mensagem, cole prints (Ctrl+V) ou anexe arquivos..."
                 className="w-full text-sm p-3 bg-white rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 resize-none"
                 rows={2}
                 onKeyDown={(e) => {
@@ -1613,7 +1598,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 
             <Button
               type="submit"
-              disabled={!newCommentText.trim() || isSubmitting || isUploadingMedia}
+              disabled={(!newCommentText.trim() && newCommentAttachments.length === 0) || isSubmitting || isUploadingMedia}
               isLoading={isSubmitting}
               className="h-[50px] px-5 shrink-0"
             >
