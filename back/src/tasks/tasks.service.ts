@@ -722,9 +722,20 @@ export class TasksService {
       throw new ForbiddenException('Apenas o autor pode editar este comentário.');
     }
 
+    const dataToUpdate: any = { conteudo: dto.conteudo };
+    if (dto.arquivo_url !== undefined) {
+      dataToUpdate.arquivo_url = dto.arquivo_url;
+    }
+    if (dto.arquivo_nome !== undefined) {
+      dataToUpdate.arquivo_nome = dto.arquivo_nome;
+    }
+    if (dto.tipo !== undefined) {
+      dataToUpdate.tipo = dto.tipo;
+    }
+
     return this.prisma.tarefaComentario.update({
       where: { id_comentario: commentId },
-      data: { conteudo: dto.conteudo },
+      data: dataToUpdate,
       include: {
         usuario: {
           select: { id_usuario: true, nome: true, email: true, role: true },

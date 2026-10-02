@@ -18,4 +18,17 @@ export class UpdateCommentDto {
   @IsNotEmpty({ message: 'O conteúdo não pode ser vazio.' })
   @IsString()
   conteudo: string;
+
+  @ApiProperty({ example: '/uploads/abc.png', description: 'URL do arquivo anexo ou null para remover', required: false })
+  @IsOptional()
+  arquivo_url?: string | null;
+
+  @ApiProperty({ example: 'foto.png', description: 'Nome do arquivo', required: false })
+  @IsOptional()
+  arquivo_nome?: string | null;
+
+  @ApiProperty({ example: 'IMAGE', description: 'Tipo do comentário', required: false })
+  @IsOptional()
+  @IsString()
+  tipo?: string;
 }

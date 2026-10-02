@@ -13,6 +13,7 @@ import {
   UploadedFile,
   UseGuards,
   UseInterceptors,
+  BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
@@ -168,6 +169,33 @@ export class TasksController {
   @ApiOperation({ summary: 'Listar todos os comentários e anexos do feed da tarefa' })
   async getComments(@Param('id', ParseIntPipe) id: number) {
     return this.tasksService.getComments(id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Post('tasks/upload')
+  @UseInterceptors(FileInterceptor('file', { storage, limits: { fileSize: 15 * 1024 * 1024 } }))
+  @ApiOperation({ summary: 'Fazer upload de imagem ou arquivo para inserção no chat da tarefa' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: { type: 'string', format: 'binary' },
+      },
+    },
+  })
+  async uploadFile(@UploadedFile() file?: Express.Multer.File) {
+    if (!file) {
+      throw new BadRequestException('Nenhum arquivo ou imagem foi enviado.');
+    }
+    const isImage = file.mimetype.startsWith('image/');
+    return {
+      url: `/uploads/${file.filename}`,
+      nome: file.originalname,
+      tipo: isImage ? 'IMAGE' : 'FILE',
+      size: file.size,
+    };
   }
 
   @UseGuards(JwtAuthGuard)
