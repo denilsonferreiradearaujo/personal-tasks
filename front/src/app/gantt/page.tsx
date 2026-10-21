@@ -37,6 +37,7 @@ export default function GanttPage() {
 
   // Filtros
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('todos'); // 'todos', 'Não iniciada', 'Em Andamento', 'Finalizada'
   const [priorityFilter, setPriorityFilter] = useState('todas');
   const [teamFilter, setTeamFilter] = useState('todas');
   const [privacyFilter, setPrivacyFilter] = useState('todas'); // 'todas', 'minhas', 'compartilhadas_comigo'
@@ -109,8 +110,29 @@ export default function GanttPage() {
     return Array.from(teams);
   }, [tasks]);
 
-  // Filtragem dinâmica das tarefas
-  const filteredTasks = useMemo(() => {
+  // Normalização e categorização inteligente de status
+  const normalizeStatus = (s: string) =>
+    (s || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+
+  const isEmAndamento = (status: string) => {
+    const s = normalizeStatus(status);
+    return s.includes('desenvolvimento') || s.includes('progresso') || s.includes('andamento');
+  };
+
+  const isFinalizado = (status: string) => {
+    const s = normalizeStatus(status);
+    return s.includes('finalizado') || s.includes('conclu') || s.includes('entregue');
+  };
+
+  const isNaoIniciado = (status: string) => {
+    return !isEmAndamento(status) && !isFinalizado(status);
+  };
+
+  // Filtragem básica por pesquisa, prioridade, equipe e privacidade
+  const baseFilteredTasks = useMemo(() => {
     return tasks.filter((t) => {
       const matchesSearch =
         t.descricao.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -136,26 +158,33 @@ export default function GanttPage() {
     });
   }, [tasks, searchTerm, priorityFilter, teamFilter, privacyFilter, currentUser]);
 
-  // Normalização de status
-  const normalizeStatus = (s: string) =>
-    (s || '')
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '');
-
-  const emDesenvolvimentoTasks = filteredTasks.filter((t) => {
-    const s = normalizeStatus(t.status);
-    return s.includes('desenvolvimento') || s.includes('progresso') || s.includes('andamento');
-  });
-
-  const finalizadoTasks = filteredTasks.filter((t) => {
-    const s = normalizeStatus(t.status);
-    return s.includes('finalizado') || s.includes('conclu') || s.includes('entregue');
-  });
-
-  const naoIniciadoTasks = filteredTasks.filter(
-    (t) => !emDesenvolvimentoTasks.includes(t) && !finalizadoTasks.includes(t)
+  // Contadores de métricas por status no escopo atual
+  const emDesenvolvimentoTasks = useMemo(
+    () => baseFilteredTasks.filter((t) => isEmAndamento(t.status)),
+    [baseFilteredTasks]
   );
+
+  const finalizadoTasks = useMemo(
+    () => baseFilteredTasks.filter((t) => isFinalizado(t.status)),
+    [baseFilteredTasks]
+  );
+
+  const naoIniciadoTasks = useMemo(
+    () => baseFilteredTasks.filter((t) => isNaoIniciado(t.status)),
+    [baseFilteredTasks]
+  );
+
+  // Filtragem dinâmica final considerando o statusFilter selecionado
+  const filteredTasks = useMemo(() => {
+    if (statusFilter === 'todos') return baseFilteredTasks;
+
+    return baseFilteredTasks.filter((t) => {
+      if (statusFilter === 'Em Andamento') return isEmAndamento(t.status);
+      if (statusFilter === 'Finalizada') return isFinalizado(t.status);
+      if (statusFilter === 'Não iniciada') return isNaoIniciado(t.status);
+      return true;
+    });
+  }, [baseFilteredTasks, statusFilter]);
 
   // Ordenação das tarefas para o Gantt (Minha Fila ou Ordem da Equipe)
   const sortedTasks = useMemo(() => {
@@ -299,9 +328,17 @@ export default function GanttPage() {
             </div>
           </div>
 
-          {/* Metrics Banner */}
+          {/* Metrics Banner (Cards interativos que também filtram ao clicar) */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs text-left">
+            <div
+              onClick={() => setStatusFilter(statusFilter === 'Não iniciada' ? 'todos' : 'Não iniciada')}
+              className={`rounded-xl border p-4 shadow-xs text-left cursor-pointer transition-all ${
+                statusFilter === 'Não iniciada'
+                  ? 'border-blue-500 bg-blue-50/50 ring-2 ring-blue-500/20'
+                  : 'border-slate-200/80 bg-white hover:border-slate-300'
+              }`}
+              title="Clique para filtrar apenas Não Iniciadas"
+            >
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
                   Não Iniciadas
@@ -314,7 +351,15 @@ export default function GanttPage() {
               <div className="text-[11px] text-slate-400 mt-0.5">Aguardando início</div>
             </div>
 
-            <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs text-left">
+            <div
+              onClick={() => setStatusFilter(statusFilter === 'Em Andamento' ? 'todos' : 'Em Andamento')}
+              className={`rounded-xl border p-4 shadow-xs text-left cursor-pointer transition-all ${
+                statusFilter === 'Em Andamento'
+                  ? 'border-amber-500 bg-amber-50/50 ring-2 ring-amber-500/20'
+                  : 'border-slate-200/80 bg-white hover:border-slate-300'
+              }`}
+              title="Clique para filtrar apenas Em Andamento"
+            >
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
                   Em Andamento
@@ -329,7 +374,15 @@ export default function GanttPage() {
               <div className="text-[11px] text-slate-400 mt-0.5">Em desenvolvimento</div>
             </div>
 
-            <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs text-left">
+            <div
+              onClick={() => setStatusFilter(statusFilter === 'Finalizada' ? 'todos' : 'Finalizada')}
+              className={`rounded-xl border p-4 shadow-xs text-left cursor-pointer transition-all ${
+                statusFilter === 'Finalizada'
+                  ? 'border-emerald-500 bg-emerald-50/50 ring-2 ring-emerald-500/20'
+                  : 'border-slate-200/80 bg-white hover:border-slate-300'
+              }`}
+              title="Clique para filtrar apenas Finalizadas"
+            >
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
                   Finalizadas
@@ -390,6 +443,18 @@ export default function GanttPage() {
                   <span>Ordem da Equipe</span>
                 </button>
               </div>
+
+              {/* Status Filter (Novo Filtro por Status Solicitado) */}
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="text-xs font-medium bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer"
+              >
+                <option value="todos">Todos os Status</option>
+                <option value="Não iniciada">Não iniciada</option>
+                <option value="Em Andamento">Em Andamento</option>
+                <option value="Finalizada">Finalizada</option>
+              </select>
 
               {/* Privacy Filter */}
               <select
