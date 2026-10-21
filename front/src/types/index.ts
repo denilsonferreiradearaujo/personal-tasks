@@ -39,6 +39,11 @@ export interface TaskShare {
   email: string;
   id_usuario?: number | null;
   data_compartilhamento: string;
+  usuario?: {
+    id_usuario: number;
+    nome: string;
+    email: string;
+  } | null;
 }
 
 export interface Task {

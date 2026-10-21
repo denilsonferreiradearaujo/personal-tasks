@@ -22,6 +22,8 @@ import {
   Clock,
   Loader2,
   Plus,
+  Maximize2,
+  Minimize2,
 } from 'lucide-react';
 import { Task, TaskComment } from '../../types';
 import { useAuth } from '../../context/AuthContext';
@@ -90,6 +92,10 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   const [shareEmail, setShareEmail] = useState('');
   const [isCopied, setIsCopied] = useState(false);
   const [shareLoading, setShareLoading] = useState(false);
+  const [removingShareId, setRemovingShareId] = useState<number | null>(null);
+
+  // Estado de tela cheia (fullscreen)
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   // Preview de imagem ampliada
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
@@ -804,6 +810,22 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     }
   };
 
+  // Remover acesso de um colaborador/e-mail específico
+  const handleRemoveShare = async (shareId: number, targetEmail: string) => {
+    if (!currentTask) return;
+    try {
+      setRemovingShareId(shareId);
+      await api.delete(`/tasks/${currentTask.id_tarefa}/share/${shareId}`);
+      await loadTaskDetails(currentTask.id_tarefa, true);
+      if (onTaskUpdated) onTaskUpdated();
+      showModalToast('success', `Acesso de ${targetEmail} removido.`);
+    } catch (err: any) {
+      showModalToast('error', err.response?.data?.message || 'Erro ao remover colaborador.');
+    } finally {
+      setRemovingShareId(null);
+    }
+  };
+
   const copyShareLink = () => {
     if (!currentTask?.shareToken) return;
     const shareUrl = `${window.location.origin}/tarefas/compartilhada/${currentTask.shareToken}`;
@@ -986,8 +1008,18 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 backdrop-blur-sm animate-fadeIn">
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden animate-scaleUp">
+    <div
+      className={`fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm animate-fadeIn ${
+        isFullscreen ? 'p-0' : 'p-4 sm:p-6'
+      }`}
+    >
+      <div
+        className={`bg-white shadow-2xl border border-slate-200 flex flex-col overflow-hidden transition-all duration-200 ${
+          isFullscreen
+            ? 'w-screen h-screen max-w-none max-h-none rounded-none'
+            : 'w-full max-w-4xl max-h-[92vh] rounded-2xl animate-scaleUp'
+        }`}
+      >
         {/* =====================================================
             CABEÇALHO DO MODAL
         ====================================================== */}
@@ -1004,9 +1036,18 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                 {currentTask.status}
               </span>
               {currentTask.isCompartilhada ? (
-                <span className="inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded-full font-semibold bg-sky-100 text-sky-800">
-                  <Globe className="w-3 h-3" /> Compartilhada
-                </span>
+                <button
+                  type="button"
+                  onClick={() => setIsSharingOpen(true)}
+                  className="inline-flex items-center gap-1.5 text-xs px-2.5 py-0.5 rounded-full font-semibold bg-sky-100 text-sky-800 hover:bg-sky-200/80 transition"
+                  title="Clique para ver ou gerenciar quem tem acesso"
+                >
+                  <Globe className="w-3 h-3" />
+                  <span>Compartilhada</span>
+                  <span className="ml-0.5 px-1.5 py-0.2 rounded-full bg-sky-200/80 text-[10px] font-bold">
+                    {(currentTask.compartilhamentos?.length || 0) + 1}
+                  </span>
+                </button>
               ) : (
                 <span className="inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded-full font-semibold bg-amber-100 text-amber-800">
                   <Lock className="w-3 h-3" /> Privada (Apenas Você)
@@ -1058,9 +1099,19 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 
             <button
               onClick={onClose}
+              title="Fechar"
               className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-200/50 rounded-xl transition"
             >
               <X className="w-5 h-5" />
+            </button>
+
+            {/* Maximizador de Tela Cheia posicionado ao lado direito do X */}
+            <button
+              onClick={() => setIsFullscreen(!isFullscreen)}
+              title={isFullscreen ? 'Restaurar tamanho' : 'Maximizar tela cheia'}
+              className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-200/50 rounded-xl transition"
+            >
+              {isFullscreen ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
             </button>
           </div>
         </div>
@@ -1095,9 +1146,15 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
             <div className="mt-3 flex flex-col sm:flex-row gap-2">
               <input
                 type="text"
-                placeholder="Convidar por e-mail (ex: colega@senai.com)..."
+                placeholder="Convidar por e-mail (Ex: nome@empresa.com)"
                 value={shareEmail}
                 onChange={(e) => setShareEmail(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleShareTask();
+                  }
+                }}
                 className="flex-1 px-3 py-1.5 text-xs bg-white rounded-lg border border-sky-200 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
               />
               <Button
@@ -1121,6 +1178,82 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                 </Button>
               )}
             </div>
+
+            {/* Lista de Colaboradores e Pessoas com Acesso (Opção 1) */}
+            {currentTask.isCompartilhada && (
+              <div className="mt-4 pt-3 border-t border-sky-200/60">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold text-sky-950 uppercase tracking-wider flex items-center gap-1.5">
+                    <Users className="w-3.5 h-3.5 text-sky-700" />
+                    Pessoas com acesso ({(currentTask.compartilhamentos?.length || 0) + 1})
+                  </span>
+                </div>
+
+                <div className="flex flex-wrap gap-2 items-center">
+                  {/* Dono / Criador */}
+                  <div className="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-white border border-sky-200 shadow-sm text-xs">
+                    <div className="w-5 h-5 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center text-[10px]">
+                      {getInitials(currentTask.nome || currentTask.email || 'U')}
+                    </div>
+                    <span className="font-semibold text-slate-800">
+                      {currentTask.nome || currentTask.email || 'Criador'}
+                    </span>
+                    <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
+                      Criador
+                    </span>
+                  </div>
+
+                  {/* Usuários / E-mails Convidados */}
+                  {currentTask.compartilhamentos && currentTask.compartilhamentos.length > 0 ? (
+                    currentTask.compartilhamentos.map((share) => {
+                      const displayName = share.usuario?.nome || share.email;
+                      const isNamed = Boolean(share.usuario?.nome);
+                      return (
+                        <div
+                          key={share.id}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white border border-sky-200 shadow-sm text-xs group hover:border-sky-300 transition"
+                        >
+                          <div className="w-5 h-5 rounded-full bg-sky-100 text-sky-800 font-bold flex items-center justify-center text-[10px]">
+                            {getInitials(displayName)}
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="font-medium text-slate-800 leading-tight">
+                              {displayName}
+                            </span>
+                            {isNamed && (
+                              <span className="text-[10px] text-slate-400 leading-tight">
+                                {share.email}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Botão de remoção individual para o dono ou admin */}
+                          {(isOwner || isPrivileged) && (
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveShare(share.id, share.email)}
+                              disabled={removingShareId === share.id}
+                              title={`Remover acesso de ${share.email}`}
+                              className="ml-1 p-0.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition"
+                            >
+                              {removingShareId === share.id ? (
+                                <Loader2 className="w-3 h-3 animate-spin text-rose-500" />
+                              ) : (
+                                <X className="w-3.5 h-3.5" />
+                              )}
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <span className="text-xs text-sky-700/80 italic py-1">
+                      A tarefa está acessível por qualquer pessoa com o link. Nenhum e-mail convidado individualmente ainda.
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
 

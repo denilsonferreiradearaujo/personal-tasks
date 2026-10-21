@@ -163,6 +163,18 @@ export class TasksController {
     return this.tasksService.unshareTask(id, req.user);
   }
 
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Delete('tasks/:id/share/:shareId')
+  @ApiOperation({ summary: 'Remover o compartilhamento com um usuário/e-mail específico' })
+  async removeShare(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('shareId', ParseIntPipe) shareId: number,
+    @Request() req: any,
+  ) {
+    return this.tasksService.removeShare(id, shareId, req.user);
+  }
+
   // --- Feed de Interação / Comentários / Anexos ---
 
   @Get('tasks/:id/comments')

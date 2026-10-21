@@ -57,7 +57,7 @@ O Personal Tasks utiliza MySQL para gerenciar usuários, tarefas e configuraçõ
 3. Crie uma nova base:
    - **Database Name:** `personal_tasks`
    - **User:** `tasks_user` (ou utilize o seu usuário root/padrão do MySQL)
-   - **Password:** Defina uma senha forte (exemplo: `Tasks@2026!Sec`)
+   - **Password:** Defina uma senha forte (exemplo: `Denilson......`)
 4. Anote essas credenciais, você as usará no arquivo `.env` do backend.
 
 ---

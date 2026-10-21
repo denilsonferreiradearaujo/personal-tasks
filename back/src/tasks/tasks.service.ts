@@ -240,7 +240,14 @@ export class TasksService {
             email: true,
           },
         },
-        compartilhamentos: true,
+        compartilhamentos: {
+          include: {
+            usuario: {
+              select: { id_usuario: true, nome: true, email: true },
+            },
+          },
+          orderBy: { data_compartilhamento: 'asc' },
+        },
         comentarios: {
           include: {
             usuario: {
@@ -587,6 +594,37 @@ export class TasksService {
     });
 
     return { message: 'Compartilhamento revogado. A tarefa voltou a ser privada.' };
+  }
+
+  async removeShare(
+    taskId: number,
+    shareId: number,
+    currentUser: { id_usuario: number; role: string },
+  ) {
+    const task = await this.findOne(taskId);
+    const isOwner = Number(task.id_usuario) === Number(currentUser.id_usuario);
+    const isPrivileged = currentUser.role === 'ADMIN' || currentUser.role === 'ROOT';
+
+    if (!isOwner && !isPrivileged) {
+      throw new ForbiddenException('Apenas o responsável pela tarefa ou administradores podem remover colaboradores.');
+    }
+
+    const shareItem = await this.prisma.tarefaCompartilhada.findFirst({
+      where: {
+        id: shareId,
+        id_tarefa: taskId,
+      },
+    });
+
+    if (!shareItem) {
+      throw new NotFoundException('Compartilhamento não encontrado.');
+    }
+
+    await this.prisma.tarefaCompartilhada.delete({
+      where: { id: shareId },
+    });
+
+    return { message: 'Acesso do colaborador removido com sucesso.', shareId };
   }
 
   async findByShareToken(shareToken: string, currentUser?: { id_usuario: number; email: string }) {
